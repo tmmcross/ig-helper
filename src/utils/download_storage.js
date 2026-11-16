@@ -2,6 +2,8 @@
  * User-selected download directory storage.
  * Handles are stored in a separate IndexedDB database, independent of media caches.
  */
+/*! ESLINT IMPORT END !*/
+
 const DOWNLOAD_DIRECTORY_DB = 'IG_HELPER_DOWNLOAD_DIRECTORY';
 const DOWNLOAD_DIRECTORY_STORE = 'HANDLES';
 const DOWNLOAD_DIRECTORY_KEY = 'root';
