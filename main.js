@@ -8435,56 +8435,257 @@
      * @param  {String|null}  metadata.uid
      * @return {Promise}
      */
+    const DOWNLOAD_DIRECTORY_DB = 'IG_HELPER_DOWNLOAD_DIRECTORY';
+    const DOWNLOAD_DIRECTORY_STORE = 'HANDLES';
+    const DOWNLOAD_DIRECTORY_KEY = 'root';
+    const INVALID_PATH_CHARS = /[<>:"\/\\|?*\u0000-\u001F]/g;
+    let downloadDirectoryDBPromise = null;
+    let downloadDirectoryHandle = null;
+    let downloadDirectoryInitPromise = null;
+    let directoryPickerPromise = null;
+    const reservedDownloadPaths = new Set();
+
+    function openDownloadDirectoryDB() {
+        if (downloadDirectoryDBPromise) return downloadDirectoryDBPromise;
+        downloadDirectoryDBPromise = new Promise((resolve, reject) => {
+            const request = indexedDB.open(DOWNLOAD_DIRECTORY_DB, 1);
+            request.onupgradeneeded = () => {
+                if (!request.result.objectStoreNames.contains(DOWNLOAD_DIRECTORY_STORE)) {
+                    request.result.createObjectStore(DOWNLOAD_DIRECTORY_STORE);
+                }
+            };
+            request.onsuccess = () => resolve(request.result);
+            request.onerror = () => reject(request.error);
+            request.onblocked = () => reject(new Error('Download directory database is blocked'));
+        }).catch(err => {
+            downloadDirectoryDBPromise = null;
+            throw err;
+        });
+        return downloadDirectoryDBPromise;
+    }
+
+    function readStoredDownloadDirectory() {
+        return openDownloadDirectoryDB().then(db => new Promise((resolve, reject) => {
+            const request = db.transaction(DOWNLOAD_DIRECTORY_STORE, 'readonly')
+                .objectStore(DOWNLOAD_DIRECTORY_STORE).get(DOWNLOAD_DIRECTORY_KEY);
+            request.onsuccess = () => resolve(request.result ?? null);
+            request.onerror = () => reject(request.error);
+        }));
+    }
+
+    function storeDownloadDirectory(handle) {
+        return openDownloadDirectoryDB().then(db => new Promise((resolve, reject) => {
+            const transaction = db.transaction(DOWNLOAD_DIRECTORY_STORE, 'readwrite');
+            transaction.objectStore(DOWNLOAD_DIRECTORY_STORE).put(handle, DOWNLOAD_DIRECTORY_KEY);
+            transaction.oncomplete = () => resolve();
+            transaction.onerror = () => reject(transaction.error);
+            transaction.onabort = () => reject(transaction.error ?? new Error('Download directory save aborted'));
+        }));
+    }
+
+    function initDownloadDirectory() {
+        if (!downloadDirectoryInitPromise) {
+            downloadDirectoryInitPromise = readStoredDownloadDirectory()
+                .then(handle => {
+                    if (!downloadDirectoryHandle && handle) downloadDirectoryHandle = handle;
+                    return downloadDirectoryHandle;
+                })
+                .catch(err => {
+                    console.warn('Unable to restore the selected download folder:', err);
+                    return null;
+                });
+        }
+        return downloadDirectoryInitPromise;
+    }
+
+    function isDirectoryPickerSupported() {
+        return typeof window.showDirectoryPicker === 'function' && typeof indexedDB !== 'undefined';
+    }
+
+    async function getDownloadDirectoryName() {
+        await initDownloadDirectory();
+        return downloadDirectoryHandle?.name ?? null;
+    }
+
+    async function selectDownloadDirectory() {
+        if (!isDirectoryPickerSupported()) throw new Error('The File System Access API is not supported in this browser.');
+        // Invoke the picker before awaiting anything so the settings-button gesture is retained.
+        const handle = await window.showDirectoryPicker({ id: 'ig-helper-download-folder', mode: 'readwrite' });
+        if (typeof handle.requestPermission === 'function') {
+            const permission = await handle.requestPermission({ mode: 'readwrite' });
+            if (permission !== 'granted') throw new Error('Write permission was not granted.');
+        }
+        downloadDirectoryHandle = handle;
+        await storeDownloadDirectory(handle);
+        return handle.name;
+    }
+
+    async function clearDownloadDirectory() {
+        downloadDirectoryHandle = null;
+        const db = await openDownloadDirectoryDB();
+        await new Promise((resolve, reject) => {
+            const transaction = db.transaction(DOWNLOAD_DIRECTORY_STORE, 'readwrite');
+            transaction.objectStore(DOWNLOAD_DIRECTORY_STORE).delete(DOWNLOAD_DIRECTORY_KEY);
+            transaction.oncomplete = () => resolve();
+            transaction.onerror = () => reject(transaction.error);
+            transaction.onabort = () => reject(transaction.error ?? new Error('Download directory removal aborted'));
+        });
+    }
+
+    function requestDirectoryWritePermission(handle) {
+        try {
+            if (typeof handle.requestPermission === 'function') return handle.requestPermission({ mode: 'readwrite' });
+            if (typeof handle.queryPermission === 'function') return handle.queryPermission({ mode: 'readwrite' });
+            return Promise.resolve('granted');
+        }
+        catch (err) {
+            return Promise.reject(err);
+        }
+    }
+
+    function getDirectoryHandleForSave() {
+        if (downloadDirectoryHandle) {
+            const handle = downloadDirectoryHandle;
+            return requestDirectoryWritePermission(handle)
+                .then(permission => permission === 'granted' ? { handle } : { fallback: true })
+                .catch(() => ({ fallback: true }));
+        }
+        if (!isDirectoryPickerSupported()) return Promise.resolve({ fallback: true });
+        if (directoryPickerPromise) return directoryPickerPromise;
+
+        // This call must remain synchronous with the initiating download click.
+        let picker;
+        try {
+            picker = window.showDirectoryPicker({ id: 'ig-helper-download-folder', mode: 'readwrite' });
+        }
+        catch (err) {
+            return Promise.resolve({ fallback: true });
+        }
+        directoryPickerPromise = Promise.resolve(picker)
+            .then(async handle => {
+                if (typeof handle.requestPermission === 'function') {
+                    const permission = await handle.requestPermission({ mode: 'readwrite' });
+                    if (permission !== 'granted') return { fallback: true };
+                }
+                downloadDirectoryHandle = handle;
+                await storeDownloadDirectory(handle);
+                return { handle };
+            })
+            .catch(err => err?.name === 'AbortError' ? { cancelled: true } : { fallback: true })
+            .finally(() => { directoryPickerPromise = null; });
+        return directoryPickerPromise;
+    }
+
+    function sanitizePathSegment(value, fallback) {
+        let result = String(value ?? '')
+            .replace(INVALID_PATH_CHARS, '_')
+            .replace(/[. ]+$/g, '')
+            .trim();
+        if (!result || /^(CON|PRN|AUX|NUL|COM[1-9]|LPT[1-9])$/i.test(result)) result = fallback;
+        return result;
+    }
+
+    async function fileExists(directoryHandle, filename) {
+        try {
+            await directoryHandle.getFileHandle(filename);
+            return true;
+        }
+        catch (err) {
+            if (err?.name === 'NotFoundError') return false;
+            throw err;
+        }
+    }
+
+    function addCollisionSuffix(filename, index) {
+        const dot = filename.lastIndexOf('.');
+        if (dot > 0) return filename.slice(0, dot) + ' (' + index + ')' + filename.slice(dot);
+        return filename + ' (' + index + ')';
+    }
+
+    async function writeBlobToDirectory(blob, filename, username, rootHandle) {
+        const userFolderName = sanitizePathSegment(username, 'unknown_user');
+        const safeFilename = sanitizePathSegment(filename, 'download');
+        const userDirectory = await rootHandle.getDirectoryHandle(userFolderName, { create: true });
+        let candidate = safeFilename;
+        let index = 1;
+        let reservation = '';
+
+        while (true) {
+            reservation = userFolderName + '/' + candidate;
+            if (!reservedDownloadPaths.has(reservation)) {
+                const exists = await fileExists(userDirectory, candidate);
+                if (!exists && !reservedDownloadPaths.has(reservation)) break;
+            }
+            candidate = addCollisionSuffix(safeFilename, index++);
+        }
+
+        reservedDownloadPaths.add(reservation);
+        try {
+            const fileHandle = await userDirectory.getFileHandle(candidate, { create: true });
+            const writable = await fileHandle.createWritable();
+            await writable.write(blob);
+            await writable.close();
+            return candidate;
+        }
+        finally {
+            reservedDownloadPaths.delete(reservation);
+        }
+    }
+
+    void initDownloadDirectory();
+
+
     function saveFiles(downloadLink, metadata) {
+        // Invoke the folder picker before deferred work; it requires transient user activation.
+        const directoryPromise = getDirectoryHandleForSave();
         return new Promise(resolve => {
-            setTimeout(() => {
+            setTimeout(async () => {
                 updateLoadingBar(true);
+                try {
+                    const destination = await directoryPromise;
+                    if (destination?.cancelled) {
+                        updateLoadingBar(false);
+                        resolve(true);
+                        return;
+                    }
+                    const directoryHandle = destination?.handle ?? null;
+                    if (metadata?.shortcode?.match(/^\d+$/) != null) metadata.shortcode = idToShortcode(metadata.shortcode);
+                    const downloadName = getSaveFileName(downloadLink, metadata);
+                    const { filetype, shortcode, sourceType } = metadata;
+                    const needsExifRewrite =
+                        USER_SETTING.MODIFY_RESOURCE_EXIF &&
+                        filetype === 'jpg' &&
+                        shortcode &&
+                        sourceType === 'photo';
 
-                if (metadata?.shortcode?.match(/^\d+$/) != null) {
-                    metadata.shortcode = idToShortcode(metadata.shortcode);
-                }
-
-                const downloadName = getSaveFileName(downloadLink, metadata);
-                const { filetype, shortcode, sourceType } = metadata;
-
-                // JPEG photos that need their EXIF rewritten must go through fetch()
-                const needsExifRewrite =
-                    USER_SETTING.MODIFY_RESOURCE_EXIF &&
-                    filetype === 'jpg' &&
-                    shortcode &&
-                    sourceType === 'photo';
-
-                if (USER_SETTING.USE_EXTERNAL_DOWNLOAD_MODE && !needsExifRewrite) {
-                    GM_download({
-                        url: downloadLink,
-                        name: downloadName,
-                        onload: () => {
-                            updateLoadingBar(false);
-                            resolve(true);
-                        },
-                        // eslint-disable-next-line no-unused-vars
-                        onerror: (err) => {
-                            updateLoadingBar(false);
-                            resolve(true);
-                        },
-                    });
-                }
-                else {
-                    fetch(downloadLink)
-                        .then(res => res.blob())
-                        .then(dwel => {
-                            updateLoadingBar(false);
-                            return createSaveFileElement(downloadLink, dwel, metadata);
-                        })
-                        .then(() => resolve(true))
-                        .catch(err => {
-                            updateLoadingBar(false);
-                            console.error('saveFiles failed:', err);
-                            resolve(false);
+                    // A selected directory needs a Blob, so it takes precedence over GM_download.
+                    if (USER_SETTING.USE_EXTERNAL_DOWNLOAD_MODE && !needsExifRewrite && !directoryHandle) {
+                        GM_download({
+                            url: downloadLink,
+                            name: downloadName,
+                            onload: () => { updateLoadingBar(false); resolve(true); },
+                            // eslint-disable-next-line no-unused-vars
+                            onerror: (err) => { updateLoadingBar(false); resolve(true); },
                         });
+                    }
+                    else {
+                        const response = await fetch(downloadLink);
+                        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                        const blob = await response.blob();
+                        await createSaveFileElement(downloadLink, blob, metadata, directoryHandle);
+                        updateLoadingBar(false);
+                        resolve(true);
+                    }
+                }
+                catch (err) {
+                    updateLoadingBar(false);
+                    console.error('saveFiles failed:', err);
+                    resolve(false);
                 }
             }, 50);
         });
+    }
+    }
     }
 
     /**
@@ -8800,40 +9001,47 @@
      * @param {Blob} blob
      * @param {string} filename
      */
-    function triggerDownload(blob, filename) {
+    function triggerDownload(blob, filename, directoryHandle = null, username = '') {
         return new Promise(resolve => {
-            const url = URL.createObjectURL(blob);
-
-            if (USER_SETTING.USE_EXTERNAL_DOWNLOAD_MODE) {
-                GM_download({
-                    url: url,
-                    name: filename,
-                    onload: () => {
+            const useBrowserDownload = () => {
+                const url = URL.createObjectURL(blob);
+                if (USER_SETTING.USE_EXTERNAL_DOWNLOAD_MODE) {
+                    GM_download({
+                        url,
+                        name: filename,
+                        onload: () => { URL.revokeObjectURL(url); resolve(); },
+                        onerror: () => { URL.revokeObjectURL(url); resolve(); },
+                    });
+                }
+                else {
+                    const link = document.createElement("a");
+                    link.href = url;
+                    link.download = filename;
+                    link.rel = "noopener";
+                    link.style.display = "none";
+                    document.body.appendChild(link);
+                    link.click();
+                    setTimeout(() => {
+                        // eslint-disable-next-line no-unused-vars
+                        try { document.body.removeChild(link); } catch (e) { /* noop */ }
                         URL.revokeObjectURL(url);
                         resolve();
-                    },
-                    onerror: () => {
-                        URL.revokeObjectURL(url);
-                        resolve();
-                    },
-                });
+                    }, 250);
+                }
+            };
+            if (directoryHandle) {
+                writeBlobToDirectory(blob, filename, username, directoryHandle)
+                    .then(() => resolve())
+                    .catch(err => {
+                        console.error('Saving to the selected folder failed; falling back to the browser download location.', err);
+                        useBrowserDownload();
+                    });
+                return;
             }
-            else {
-                const link = document.createElement("a");
-                link.href = url;
-                link.download = filename;
-                link.rel = "noopener";
-                link.style.display = "none";
-                document.body.appendChild(link);
-                link.click();
-                setTimeout(() => {
-                    // eslint-disable-next-line no-unused-vars
-                    try { document.body.removeChild(link); } catch (e) { /* noop */ }
-                    URL.revokeObjectURL(url);
-                    resolve();
-                }, 250);
-            }
+            useBrowserDownload();
         });
+    }
+    }
     }
 
     /**
@@ -8934,7 +9142,7 @@
      * @param  {String|null}  metadata.uid
      * @return {void}
      */
-    async function createSaveFileElement(downloadLink, object, metadata) {
+    async function createSaveFileElement(downloadLink, object, metadata, directoryHandle = null) {
         let { username, sourceType, filetype, shortcode } = metadata;
 
         if (metadata.uid == null) {
@@ -8963,15 +9171,15 @@
         ) {
             try {
                 const newBlob = await changeExifData(object, metadata);
-                await triggerDownload(newBlob, downloadName);
+                await triggerDownload(newBlob, downloadName, directoryHandle, username);
             } catch (err) {
                 console.error('Failed to strip EXIF and/or attach post URL to EXIF.', err);
-                await triggerDownload(object, downloadName);
+                await triggerDownload(object, downloadName, directoryHandle, username);
             }
             return;
         }
         else {
-            await triggerDownload(object, downloadName);
+            await triggerDownload(object, downloadName, directoryHandle, username);
         }
     }
 
