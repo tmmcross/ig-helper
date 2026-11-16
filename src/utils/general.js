@@ -1,4 +1,5 @@
 import { USER_SETTING, state, userIdCache, $body, SVG, LEGACY_SETTING_MIGRATIONS } from "../settings";
+import { getDirectoryHandleForSave, writeBlobToDirectory } from "./download_storage";
 import { _i18n } from "./i18n";
 import { getUserId } from "./api";
 import { getImageFromCache, mediaIdFromURL } from "./image_cache";
@@ -1330,55 +1331,55 @@ export function setDownloadProgress(now, total) {
  * @return {Promise}
  */
 export function saveFiles(downloadLink, metadata) {
+    // Invoke the folder picker before deferred work; it requires transient user activation.
+    const directoryPromise = getDirectoryHandleForSave();
     return new Promise(resolve => {
-        setTimeout(() => {
+        setTimeout(async () => {
             updateLoadingBar(true);
+            try {
+                const destination = await directoryPromise;
+                if (destination?.cancelled) {
+                    updateLoadingBar(false);
+                    resolve(true);
+                    return;
+                }
+                const directoryHandle = destination?.handle ?? null;
+                if (metadata?.shortcode?.match(/^\d+$/) != null) metadata.shortcode = idToShortcode(metadata.shortcode);
+                const downloadName = getSaveFileName(downloadLink, metadata);
+                const { filetype, shortcode, sourceType } = metadata;
+                const needsExifRewrite =
+                    USER_SETTING.MODIFY_RESOURCE_EXIF &&
+                    filetype === 'jpg' &&
+                    shortcode &&
+                    sourceType === 'photo';
 
-            if (metadata?.shortcode?.match(/^\d+$/) != null) {
-                metadata.shortcode = idToShortcode(metadata.shortcode);
-            }
-
-            const downloadName = getSaveFileName(downloadLink, metadata);
-            const { filetype, shortcode, sourceType } = metadata;
-
-            // JPEG photos that need their EXIF rewritten must go through fetch()
-            const needsExifRewrite =
-                USER_SETTING.MODIFY_RESOURCE_EXIF &&
-                filetype === 'jpg' &&
-                shortcode &&
-                sourceType === 'photo';
-
-            if (USER_SETTING.USE_EXTERNAL_DOWNLOAD_MODE && !needsExifRewrite) {
-                GM_download({
-                    url: downloadLink,
-                    name: downloadName,
-                    onload: () => {
-                        updateLoadingBar(false);
-                        resolve(true);
-                    },
-                    // eslint-disable-next-line no-unused-vars
-                    onerror: (err) => {
-                        updateLoadingBar(false);
-                        resolve(true);
-                    },
-                });
-            }
-            else {
-                fetch(downloadLink)
-                    .then(res => res.blob())
-                    .then(dwel => {
-                        updateLoadingBar(false);
-                        return createSaveFileElement(downloadLink, dwel, metadata);
-                    })
-                    .then(() => resolve(true))
-                    .catch(err => {
-                        updateLoadingBar(false);
-                        console.error('saveFiles failed:', err);
-                        resolve(false);
+                // A selected directory needs a Blob, so it takes precedence over GM_download.
+                if (USER_SETTING.USE_EXTERNAL_DOWNLOAD_MODE && !needsExifRewrite && !directoryHandle) {
+                    GM_download({
+                        url: downloadLink,
+                        name: downloadName,
+                        onload: () => { updateLoadingBar(false); resolve(true); },
+                        // eslint-disable-next-line no-unused-vars
+                        onerror: (err) => { updateLoadingBar(false); resolve(true); },
                     });
+                }
+                else {
+                    const response = await fetch(downloadLink);
+                    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                    const blob = await response.blob();
+                    await createSaveFileElement(downloadLink, blob, metadata, directoryHandle);
+                    updateLoadingBar(false);
+                    resolve(true);
+                }
+            }
+            catch (err) {
+                updateLoadingBar(false);
+                console.error('saveFiles failed:', err);
+                resolve(false);
             }
         }, 50);
     });
+}
 }
 
 /**
@@ -1694,40 +1695,46 @@ export async function tryHandleDashFromMediaItem({
  * @param {Blob} blob
  * @param {string} filename
  */
-export function triggerDownload(blob, filename) {
+export function triggerDownload(blob, filename, directoryHandle = null, username = '') {
     return new Promise(resolve => {
-        const url = URL.createObjectURL(blob);
-
-        if (USER_SETTING.USE_EXTERNAL_DOWNLOAD_MODE) {
-            GM_download({
-                url: url,
-                name: filename,
-                onload: () => {
+        const useBrowserDownload = () => {
+            const url = URL.createObjectURL(blob);
+            if (USER_SETTING.USE_EXTERNAL_DOWNLOAD_MODE) {
+                GM_download({
+                    url,
+                    name: filename,
+                    onload: () => { URL.revokeObjectURL(url); resolve(); },
+                    onerror: () => { URL.revokeObjectURL(url); resolve(); },
+                });
+            }
+            else {
+                const link = document.createElement("a");
+                link.href = url;
+                link.download = filename;
+                link.rel = "noopener";
+                link.style.display = "none";
+                document.body.appendChild(link);
+                link.click();
+                setTimeout(() => {
+                    // eslint-disable-next-line no-unused-vars
+                    try { document.body.removeChild(link); } catch (e) { /* noop */ }
                     URL.revokeObjectURL(url);
                     resolve();
-                },
-                onerror: () => {
-                    URL.revokeObjectURL(url);
-                    resolve();
-                },
-            });
+                }, 250);
+            }
+        };
+        if (directoryHandle) {
+            writeBlobToDirectory(blob, filename, username, directoryHandle)
+                .then(() => resolve())
+                .catch(err => {
+                    console.error('Saving to the selected folder failed; falling back to the browser download location.', err);
+                    useBrowserDownload();
+                });
+            return;
         }
-        else {
-            const link = document.createElement("a");
-            link.href = url;
-            link.download = filename;
-            link.rel = "noopener";
-            link.style.display = "none";
-            document.body.appendChild(link);
-            link.click();
-            setTimeout(() => {
-                // eslint-disable-next-line no-unused-vars
-                try { document.body.removeChild(link); } catch (e) { /* noop */ }
-                URL.revokeObjectURL(url);
-                resolve();
-            }, 250);
-        }
+        useBrowserDownload();
     });
+}
 }
 
 /**
@@ -1828,7 +1835,7 @@ export function getSaveFileName(downloadLink, metadata) {
  * @param  {String|null}  metadata.uid
  * @return {void}
  */
-export async function createSaveFileElement(downloadLink, object, metadata) {
+export async function createSaveFileElement(downloadLink, object, metadata, directoryHandle = null) {
     let { username, sourceType, filetype, shortcode } = metadata;
 
     if (metadata.uid == null) {
@@ -1857,15 +1864,15 @@ export async function createSaveFileElement(downloadLink, object, metadata) {
     ) {
         try {
             const newBlob = await changeExifData(object, metadata);
-            await triggerDownload(newBlob, downloadName);
+            await triggerDownload(newBlob, downloadName, directoryHandle, username);
         } catch (err) {
             console.error('Failed to strip EXIF and/or attach post URL to EXIF.', err);
-            await triggerDownload(object, downloadName);
+            await triggerDownload(object, downloadName, directoryHandle, username);
         }
         return;
     }
     else {
-        await triggerDownload(object, downloadName);
+        await triggerDownload(object, downloadName, directoryHandle, username);
     }
 }
 
