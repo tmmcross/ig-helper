@@ -1380,7 +1380,6 @@ export function saveFiles(downloadLink, metadata) {
         }, 50);
     });
 }
-}
 
 /**
  * fetchArrayBuffer
@@ -1734,7 +1733,6 @@ export function triggerDownload(blob, filename, directoryHandle = null, username
         }
         useBrowserDownload();
     });
-}
 }
 
 /**
