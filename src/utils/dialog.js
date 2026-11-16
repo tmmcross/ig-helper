@@ -1,6 +1,7 @@
 import { locale_manifest, PARENT_CHILD_MAPPING, state, SVG, USER_SETTING, $body } from "../settings";
 import { callNotification, getPlatformModifierKey, logger, reloadScript } from "./general";
 import { _i18n } from "./i18n";
+import { clearDownloadDirectory, getDownloadDirectoryName, isDirectoryPickerSupported, selectDownloadDirectory } from "./download_storage";
 import { showRenameFormatEditor } from "./rename_format";
 /*! ESLINT IMPORT END !*/
 
@@ -232,6 +233,39 @@ export function showSetting() {
     }
 
     const $popupBody = $('.IG_POPUP_DIG .IG_POPUP_DIG_BODY');
+
+    const $downloadFolder = $(`
+        <div class="globalSettings download-folder-setting" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:8px 10px;">
+            <span style="flex:1;min-width:150px;">Download folder: <strong class="download-folder-name">Not set</strong></span>
+            <button type="button" class="download-folder-select">Choose folder</button>
+            <button type="button" class="download-folder-clear">Clear</button>
+        </div>
+    `);
+    $popupBody.append($downloadFolder);
+    const $folderName = $downloadFolder.find('.download-folder-name');
+    getDownloadDirectoryName().then(name => $folderName.text(name || 'Not set'));
+
+    if (!isDirectoryPickerSupported()) {
+        $downloadFolder.find('.download-folder-select').prop('disabled', true);
+        $folderName.text('Not supported in this browser');
+    }
+
+    $downloadFolder.find('.download-folder-select').on('click', async () => {
+        try {
+            const name = await selectDownloadDirectory();
+            $folderName.text(name);
+        }
+        catch (err) {
+            if (err?.name !== 'AbortError') {
+                console.error('Unable to select download folder:', err);
+                alert('Unable to select the download folder in this browser.');
+            }
+        }
+    });
+    $downloadFolder.find('.download-folder-clear').on('click', async () => {
+        await clearDownloadDirectory();
+        $folderName.text('Not set');
+    });
 
     for (const name in USER_SETTING) {
         $popupBody.append(`
