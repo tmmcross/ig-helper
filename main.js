@@ -8685,8 +8685,6 @@
             }, 50);
         });
     }
-    }
-    }
 
     /**
      * fetchArrayBuffer
@@ -9040,8 +9038,6 @@
             }
             useBrowserDownload();
         });
-    }
-    }
     }
 
     /**
