@@ -5,6 +5,7 @@
 const DOWNLOAD_DIRECTORY_DB = 'IG_HELPER_DOWNLOAD_DIRECTORY';
 const DOWNLOAD_DIRECTORY_STORE = 'HANDLES';
 const DOWNLOAD_DIRECTORY_KEY = 'root';
+const INVALID_PATH_CHARS = /[<>:"\/\\|?*\u0000-\u001F]/g;
 let downloadDirectoryDBPromise = null;
 let downloadDirectoryHandle = null;
 let downloadDirectoryInitPromise = null;
@@ -144,7 +145,7 @@ export function getDirectoryHandleForSave() {
 
 function sanitizePathSegment(value, fallback) {
     let result = String(value ?? '')
-        .replace(/[<>:"\/\\|?*\u0000-\u001F]/g, '_')
+        .replace(INVALID_PATH_CHARS, '_')
         .replace(/[. ]+$/g, '')
         .trim();
     if (!result || /^(CON|PRN|AUX|NUL|COM[1-9]|LPT[1-9])$/i.test(result)) result = fallback;
@@ -164,8 +165,8 @@ async function fileExists(directoryHandle, filename) {
 
 function addCollisionSuffix(filename, index) {
     const dot = filename.lastIndexOf('.');
-    if (dot > 0) return \`\${filename.slice(0, dot)} (\${index})\${filename.slice(dot)}\`;
-    return \`\${filename} (\${index})\`;
+    if (dot > 0) return filename.slice(0, dot) + ' (' + index + ')' + filename.slice(dot);
+    return filename + ' (' + index + ')';
 }
 
 export async function writeBlobToDirectory(blob, filename, username, rootHandle) {
@@ -174,10 +175,17 @@ export async function writeBlobToDirectory(blob, filename, username, rootHandle)
     const userDirectory = await rootHandle.getDirectoryHandle(userFolderName, { create: true });
     let candidate = safeFilename;
     let index = 1;
-    while (reservedDownloadPaths.has(\`\${userFolderName}/\${candidate}\`) || await fileExists(userDirectory, candidate)) {
+    let reservation = '';
+
+    while (true) {
+        reservation = userFolderName + '/' + candidate;
+        if (!reservedDownloadPaths.has(reservation)) {
+            const exists = await fileExists(userDirectory, candidate);
+            if (!exists && !reservedDownloadPaths.has(reservation)) break;
+        }
         candidate = addCollisionSuffix(safeFilename, index++);
     }
-    const reservation = \`\${userFolderName}/\${candidate}\`;
+
     reservedDownloadPaths.add(reservation);
     try {
         const fileHandle = await userDirectory.getFileHandle(candidate, { create: true });
