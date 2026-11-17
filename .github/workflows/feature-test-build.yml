@@ -11,6 +11,12 @@ on:
 permissions:
   contents: write
 
+# Serialize builds that commit the generated main.js back to this branch.
+# Keep the active run; newer pending runs replace older pending runs.
+concurrency:
+  group: feature-branch-test-build-${{ github.ref }}
+  cancel-in-progress: false
+
 jobs:
   build:
     runs-on: ubuntu-latest
