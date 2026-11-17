@@ -292,7 +292,7 @@ export function showSetting() {
         options.forEach(([value, text]) => {
             $select.append($('<option></option>').val(value).text(text));
         });
-        $select.val(DOWNLOAD_OPTIONS[key]);
+        $select.val(DOWNLOAD_OPTIONS[key] || options[0][0]);
         $row.append($select);
         $downloadOptions.append($row);
     });
