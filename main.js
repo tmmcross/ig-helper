@@ -111,7 +111,7 @@
         'NEW_TAB_OPEN_HIGHEST_VIDEO_VIA_REELS_MEDIA_API': 'NEW_TAB_OPEN_HIGHEST_VIDEO_VIA_GRAPHQL'
     };
 
-    const DEFAULT_RENAME_FORMAT = '%USERNAME%-%SOURCE_TYPE%-%SHORTCODE%-%YEAR%%MONTH%%DAY%_%HOUR%%MINUTE%%SECOND%_%ORIGINAL_NAME_FIRST%';
+    const DEFAULT_RENAME_FORMAT = '%SHORTCODE%-%ORIGINAL_NAME%';
 
     const IMAGE_CACHE_KEY = 'URLS_OF_IMAGES_TEMPORARILY_STORED';
     const IMAGE_CACHE_MAX_AGE = 12 * 60 * 60 * 1000;
@@ -8638,14 +8638,19 @@
     function saveFiles(downloadLink, metadata) {
         // Invoke the folder picker before deferred work; it requires transient user activation.
         const directoryPromise = getDirectoryHandleForSave();
+        beginDownloadNotice();
         return new Promise(resolve => {
+            const finish = (success) => {
+                finishDownloadNotice(success);
+                resolve(success);
+            };
             setTimeout(async () => {
                 updateLoadingBar(true);
                 try {
                     const destination = await directoryPromise;
                     if (destination?.cancelled) {
                         updateLoadingBar(false);
-                        resolve(true);
+                        finish(null);
                         return;
                     }
                     const directoryHandle = destination?.handle ?? null;
@@ -8663,9 +8668,9 @@
                         GM_download({
                             url: downloadLink,
                             name: downloadName,
-                            onload: () => { updateLoadingBar(false); resolve(true); },
+                            onload: () => { updateLoadingBar(false); finish(true); },
                             // eslint-disable-next-line no-unused-vars
-                            onerror: (err) => { updateLoadingBar(false); resolve(true); },
+                            onerror: (err) => { updateLoadingBar(false); finish(false); },
                         });
                     }
                     else {
@@ -8674,17 +8679,94 @@
                         const blob = await response.blob();
                         await createSaveFileElement(downloadLink, blob, metadata, directoryHandle);
                         updateLoadingBar(false);
-                        resolve(true);
+                        finish(true);
                     }
                 }
                 catch (err) {
                     updateLoadingBar(false);
                     console.error('saveFiles failed:', err);
-                    resolve(false);
+                    finish(false);
                 }
             }, 50);
         });
     }
+
+    /**
+     * Download status toast shared by concurrent and batch downloads.
+     */
+    let activeDownloadNotices = 0;
+    let failedDownloadNotices = 0;
+    let downloadNoticeElement = null;
+    let downloadNoticeTimer = null;
+
+    function showDownloadNotice(message, isError = false) {
+        if (!downloadNoticeElement) {
+            downloadNoticeElement = document.createElement('div');
+            downloadNoticeElement.id = 'IG_HELPER_DOWNLOAD_NOTICE';
+            Object.assign(downloadNoticeElement.style, {
+                position: 'fixed',
+                right: '20px',
+                bottom: '24px',
+                zIndex: '2147483647',
+                padding: '10px 16px',
+                borderRadius: '8px',
+                background: 'rgba(32, 32, 32, 0.94)',
+                color: '#fff',
+                fontSize: '14px',
+                lineHeight: '1.4',
+                fontWeight: '600',
+                boxShadow: '0 2px 12px rgba(0,0,0,.25)',
+                pointerEvents: 'none',
+                opacity: '0',
+                transition: 'opacity .15s ease'
+            });
+            document.body.appendChild(downloadNoticeElement);
+        }
+        downloadNoticeElement.textContent = message;
+        downloadNoticeElement.style.background = isError ? 'rgba(170, 35, 35, .96)' : 'rgba(32, 32, 32, .94)';
+        downloadNoticeElement.style.opacity = '1';
+    }
+
+    function beginDownloadNotice() {
+        if (activeDownloadNotices === 0) failedDownloadNotices = 0;
+        activeDownloadNotices++;
+        clearTimeout(downloadNoticeTimer);
+        showDownloadNotice('保存中…');
+    }
+
+    function finishDownloadNotice(success) {
+        activeDownloadNotices = Math.max(0, activeDownloadNotices - 1);
+        if (success === false) failedDownloadNotices++;
+        if (activeDownloadNotices > 0) {
+            showDownloadNotice('保存中…');
+            return;
+        }
+        if (success === null) {
+            if (downloadNoticeElement) {
+                downloadNoticeElement.style.opacity = '0';
+                downloadNoticeTimer = setTimeout(() => {
+                    downloadNoticeElement?.remove();
+                    downloadNoticeElement = null;
+                }, 180);
+            }
+            return;
+        }
+
+        const failed = failedDownloadNotices;
+        showDownloadNotice(failed ? '保存に失敗しました' : '保存しました！', failed > 0);
+        downloadNoticeTimer = setTimeout(() => {
+            if (activeDownloadNotices === 0 && downloadNoticeElement) {
+                downloadNoticeElement.style.opacity = '0';
+                setTimeout(() => {
+                    if (activeDownloadNotices === 0 && downloadNoticeElement) {
+                        downloadNoticeElement.remove();
+                        downloadNoticeElement = null;
+                    }
+                }, 180);
+            }
+        }, 2200);
+    }
+
 
     /**
      * fetchArrayBuffer
@@ -9069,7 +9151,7 @@
          */
         if (USER_SETTING.MATCH_VIDEO_FILENAME_TO_THUMBNAIL && (filetype === 'mp4' || filetype === 'm4a') && thumbnailURL) {
             const thumbnailName = new URL(thumbnailURL).pathname.split('/').at(-1).split('.').slice(0, -1).join('.');
-            return username + '_' + thumbnailName + '.' + filetype;
+            return (shortcode ? shortcode + '-' : '') + thumbnailName + '.' + filetype;
         }
 
         timestamp = parseInt(timestamp.toString().padEnd(13, '0'));
@@ -9090,7 +9172,7 @@
         });
 
         var replacements = {
-            '%USERNAME%': username,
+            '%USERNAME%': '',
             '%SOURCE_TYPE%': sourceType,
             '%SHORTCODE%': shortcode || '',
             '%YEAR%': year,
@@ -9113,13 +9195,14 @@
             }
 
             return replacements[str];
-        });
+        }).replace(/^-+/, '').replace(/-+$/, '');
 
-        const originally = username + '_' + original_name + '.' + filetype;
+        const originally = (shortcode ? shortcode + '-' : '') + original_name + '.' + filetype;
         const downloadName = USER_SETTING.AUTO_RENAME ? filename + '.' + filetype : originally;
 
         return downloadName;
     }
+
 
 
     /**
@@ -9139,7 +9222,10 @@
      * @return {void}
      */
     async function createSaveFileElement(downloadLink, object, metadata, directoryHandle = null) {
-        let { username, sourceType, filetype, shortcode } = metadata;
+        beginDownloadNotice();
+        let noticeSuccess = false;
+        try {
+            let { username, sourceType, filetype, shortcode } = metadata;
 
         if (metadata.uid == null) {
             username = metadata.username;
@@ -9172,12 +9258,17 @@
                 console.error('Failed to strip EXIF and/or attach post URL to EXIF.', err);
                 await triggerDownload(object, downloadName, directoryHandle, username);
             }
-            return;
         }
         else {
             await triggerDownload(object, downloadName, directoryHandle, username);
         }
+            noticeSuccess = true;
+        }
+        finally {
+            finishDownloadNotice(noticeSuccess);
+        }
     }
+
 
     /**
      * changeExifData
@@ -9650,6 +9741,12 @@
      * @return {void}
      */
     function initSettings() {
+        const legacyRenameFormat = '%USERNAME%-%SOURCE_TYPE%-%SHORTCODE%-%YEAR%%MONTH%%DAY%_%HOUR%%MINUTE%%SECOND%_%ORIGINAL_NAME_FIRST%';
+        if (state.fileRenameFormat === legacyRenameFormat) {
+            state.fileRenameFormat = DEFAULT_RENAME_FORMAT;
+            GM_setValue('G_RENAME_FORMAT', DEFAULT_RENAME_FORMAT);
+        }
+
         for (const [legacyName, currentName] of Object.entries(LEGACY_SETTING_MIGRATIONS)) {
             const legacyValue = GM_getValue(legacyName);
             if (GM_getValue(currentName) == null && typeof legacyValue === 'boolean') {
@@ -9667,6 +9764,7 @@
             }
         }
     }
+
 
 
     /**
