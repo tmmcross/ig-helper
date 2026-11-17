@@ -20,6 +20,7 @@
 // @description:zh-CN  一键下载 Instagram 帖子中的照片和视频，还包括快拍、Reels 和头像。
 // @description:zh-TW  一鍵下載 Instagram 貼文中的照片、影片，還包含限時動態、Reels 與大頭貼。
 // @author             SN-Koarashi (5026)
+// @author             tmmcross
 // @match              https://*.instagram.com/*
 // @grant              GM_addStyle
 // @grant              GM_download
