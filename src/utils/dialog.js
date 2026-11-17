@@ -1,4 +1,4 @@
-import { locale_manifest, PARENT_CHILD_MAPPING, state, SVG, USER_SETTING, $body } from "../settings";
+import { locale_manifest, PARENT_CHILD_MAPPING, DOWNLOAD_OPTIONS, state, SVG, USER_SETTING, $body } from "../settings";
 import { callNotification, getPlatformModifierKey, logger, reloadScript } from "./general";
 import { _i18n } from "./i18n";
 import { showRenameFormatEditor } from "./rename_format";
@@ -234,8 +234,28 @@ export function showSetting() {
     const $popupBody = $('.IG_POPUP_DIG .IG_POPUP_DIG_BODY');
 
     // Filename format details are configured from AUTO_RENAME's context menu.
-    const $filenameSection = $('<section class="ih-settings-section"><h3>ファイル名・メタデータ</h3></section>');
+    const $filenameSection = $('<section class="ih-settings-section"><h3>ファイル名・メタデータ</h3><div class="ih-download-options"></div></section>');
     $popupBody.append($filenameSection);
+    const $downloadOptions = $filenameSection.find('.ih-download-options');
+
+    const $saveLocationRow = $(`
+        <label class="globalSettings">
+            <span>保存場所確認ウインドウ</span>
+            <input id="ih-save-location-dialog" type="checkbox" ${DOWNLOAD_OPTIONS.saveLocationDialog === 'show' ? 'checked' : ''}>
+            <div class="chbtn"><div class="rounds"></div></div>
+        </label>
+    `);
+    $downloadOptions.append($saveLocationRow);
+
+    const $collisionRow = $('<label class="globalSettings"></label>');
+    $collisionRow.append($('<span>同名ファイルの処理</span>'));
+    const $collisionSelect = $('<select class="ih-download-option" data-option="collisionMode" aria-label="同名ファイルの処理"></select>');
+    [['overwrite', '上書き'], ['suffix', '連番を付ける'], ['skip', 'スキップ']].forEach(([value, label]) => {
+        $collisionSelect.append($('<option></option>').val(value).text(label));
+    });
+    $collisionSelect.val(DOWNLOAD_OPTIONS.collisionMode);
+    $collisionRow.append($collisionSelect);
+    $downloadOptions.append($collisionRow);
 
     const settingGroups = [
         { title: 'ダウンロード動作', names: ['DIRECT_DOWNLOAD_ALL', 'DIRECT_DOWNLOAD_STORY', 'DIRECT_DOWNLOAD_VISIBLE_RESOURCE', 'FORCE_FETCH_ALL_RESOURCES', 'USE_EXTERNAL_DOWNLOAD_MODE'] },
