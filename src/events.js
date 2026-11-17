@@ -2,7 +2,7 @@ import { state, USER_SETTING, $body, PARENT_CHILD_MAPPING } from "./settings";
 import {
     reloadScript,
     triggerLinkElement, openNewTab, saveFiles, logger, updatePopupSelectionSummary,
-    replaceSameOriginHost
+    replaceSameOriginHost, setActiveDownloadButton
 } from "./utils/general";
 import { onStory, onStoryAll, onStoryThumbnail } from "./functions/story";
 import { onStoryTaggedProfiles } from "./functions/storyTaggedProfiles";
@@ -168,6 +168,18 @@ $(function () {
             GM_setValue(name, isChecked);
             USER_SETTING[name] = isChecked;
 
+            // The overwrite and skip behaviors are mutually exclusive.
+            if (isChecked && name === 'OVERWRITE_EXISTING_FILES') {
+                USER_SETTING.SKIP_EXISTING_FILES = false;
+                GM_setValue('SKIP_EXISTING_FILES', false);
+                $('.IG_POPUP_DIG input#SKIP_EXISTING_FILES').prop('checked', false);
+            }
+            else if (isChecked && name === 'SKIP_EXISTING_FILES') {
+                USER_SETTING.OVERWRITE_EXISTING_FILES = false;
+                GM_setValue('OVERWRITE_EXISTING_FILES', false);
+                $('.IG_POPUP_DIG input#OVERWRITE_EXISTING_FILES').prop('checked', false);
+            }
+
             if (isChecked) {
                 for (const [parent, children] of Object.entries(PARENT_CHILD_MAPPING)) {
                     if (children.includes(name) && USER_SETTING[parent] !== true) {
@@ -299,11 +311,13 @@ $(function () {
 
     // Running if user left-click download icon in stories
     $body.on('click', '.IG_DWSTORY', function () {
+        if (!setActiveDownloadButton(this)) return;
         onStory(true);
     });
 
     // Running if user left-click all download icon in stories
     $body.on('click', '.IG_DWSTORY_ALL', function () {
+        if (!setActiveDownloadButton(this)) return;
         onStoryAll();
     });
 
@@ -326,22 +340,26 @@ $(function () {
 
     // Running if user left-click download thumbnail icon in stories
     $body.on('click', '.IG_DWSTORY_THUMBNAIL', function () {
+        if (!setActiveDownloadButton(this)) return;
         onStoryThumbnail(true);
     });
 
     // Running if user left-click download icon in profile
     $body.on('click', '.IG_DWPROFILE', function (e) {
         e.stopPropagation();
+        if (!setActiveDownloadButton(this)) return;
         onProfileAvatar(true);
     });
 
     // Running if user left-click download icon in highlight stories
     $body.on('click', '.IG_DWHISTORY', function () {
+        if (!setActiveDownloadButton(this)) return;
         onHighlightsStory(true);
     });
 
     // Running if user left-click all download icon in highlight stories
     $body.on('click', '.IG_DWHISTORY_ALL', function () {
+        if (!setActiveDownloadButton(this)) return;
         onHighlightsStoryAll();
     });
 
@@ -353,11 +371,13 @@ $(function () {
 
     // Running if user left-click thumbnail download icon in highlight stories
     $body.on('click', '.IG_DWHISTORY_THUMBNAIL', function () {
+        if (!setActiveDownloadButton(this)) return;
         onHighlightsStoryThumbnail(true);
     });
 
     // Running if user left-click download icon in reels
     $body.on('click', '.IG_REELS', function () {
+        if (!setActiveDownloadButton(this)) return;
         onReels(true, true);
     });
 
@@ -368,6 +388,7 @@ $(function () {
 
     // Running if user left-click download icon in reels
     $body.on('click', '.IG_REELS_THUMBNAIL', function () {
+        if (!setActiveDownloadButton(this)) return;
         onReels(true, false, false, this);
     });
 

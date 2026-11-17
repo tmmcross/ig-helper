@@ -1,4 +1,5 @@
-import { USER_SETTING, state, userIdCache, $body, SVG, LEGACY_SETTING_MIGRATIONS } from "../settings";
+import { USER_SETTING, state, userIdCache, $body, SVG, LEGACY_SETTING_MIGRATIONS, DEFAULT_RENAME_FORMAT } from "../settings";
+import { getDirectoryHandleForSave, writeBlobToDirectory } from "./download_storage";
 import { _i18n } from "./i18n";
 import { getUserId } from "./api";
 import { getImageFromCache, mediaIdFromURL } from "./image_cache";
@@ -1330,55 +1331,265 @@ export function setDownloadProgress(now, total) {
  * @return {Promise}
  */
 export function saveFiles(downloadLink, metadata) {
+    // Invoke the folder picker before deferred work; it requires transient user activation.
+    const directoryPromise = getDirectoryHandleForSave();
+    beginDownloadButtonJob();
     return new Promise(resolve => {
-        setTimeout(() => {
+        const finish = (success) => {
+            finishDownloadButtonJob(success);
+            resolve(success);
+        };
+        setTimeout(async () => {
             updateLoadingBar(true);
+            try {
+                const destination = await directoryPromise;
+                if (destination?.cancelled) {
+                    updateLoadingBar(false);
+                    finish(null);
+                    return;
+                }
+                const directoryHandle = destination?.handle ?? null;
+                if (metadata?.shortcode?.match(/^\d+$/) != null) metadata.shortcode = idToShortcode(metadata.shortcode);
+                const downloadName = getSaveFileName(downloadLink, metadata);
+                const { filetype, shortcode, sourceType } = metadata;
+                const needsExifRewrite =
+                    USER_SETTING.MODIFY_RESOURCE_EXIF &&
+                    filetype === 'jpg' &&
+                    shortcode &&
+                    sourceType === 'photo';
 
-            if (metadata?.shortcode?.match(/^\d+$/) != null) {
-                metadata.shortcode = idToShortcode(metadata.shortcode);
-            }
-
-            const downloadName = getSaveFileName(downloadLink, metadata);
-            const { filetype, shortcode, sourceType } = metadata;
-
-            // JPEG photos that need their EXIF rewritten must go through fetch()
-            const needsExifRewrite =
-                USER_SETTING.MODIFY_RESOURCE_EXIF &&
-                filetype === 'jpg' &&
-                shortcode &&
-                sourceType === 'photo';
-
-            if (USER_SETTING.USE_EXTERNAL_DOWNLOAD_MODE && !needsExifRewrite) {
-                GM_download({
-                    url: downloadLink,
-                    name: downloadName,
-                    onload: () => {
-                        updateLoadingBar(false);
-                        resolve(true);
-                    },
-                    // eslint-disable-next-line no-unused-vars
-                    onerror: (err) => {
-                        updateLoadingBar(false);
-                        resolve(true);
-                    },
-                });
-            }
-            else {
-                fetch(downloadLink)
-                    .then(res => res.blob())
-                    .then(dwel => {
-                        updateLoadingBar(false);
-                        return createSaveFileElement(downloadLink, dwel, metadata);
-                    })
-                    .then(() => resolve(true))
-                    .catch(err => {
-                        updateLoadingBar(false);
-                        console.error('saveFiles failed:', err);
-                        resolve(false);
+                // A selected directory needs a Blob, so it takes precedence over GM_download.
+                if (USER_SETTING.USE_EXTERNAL_DOWNLOAD_MODE && !needsExifRewrite && !directoryHandle) {
+                    GM_download({
+                        url: downloadLink,
+                        name: downloadName,
+                        onload: () => { updateLoadingBar(false); finish(true); },
+                        // eslint-disable-next-line no-unused-vars
+                        onerror: (err) => { updateLoadingBar(false); finish(false); },
                     });
+                }
+                else {
+                    const response = await fetch(downloadLink);
+                    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                    const blob = await response.blob();
+                    await createSaveFileElement(downloadLink, blob, metadata, directoryHandle);
+                    updateLoadingBar(false);
+                    finish(true);
+                }
+            }
+            catch (err) {
+                updateLoadingBar(false);
+                console.error('saveFiles failed:', err);
+                finish(false);
             }
         }, 50);
     });
+}
+
+/**
+ * Reflect the current download state on the originating download icon.
+ * Batch downloads share one button state until all saveFiles() calls finish.
+ */
+const DOWNLOAD_BUTTON_SELECTOR = '.IG_DWSTORY, .IG_DWSTORY_ALL, .IG_DWSTORY_THUMBNAIL, .IG_DWPROFILE, .IG_DWHISTORY, .IG_DWHISTORY_ALL, .IG_DWHISTORY_THUMBNAIL, .IG_REELS, .IG_REELS_THUMBNAIL';
+let activeDownloadButton = null;
+let activeDownloadJobs = 0;
+let activeDownloadFailed = false;
+let activeDownloadCancelled = false;
+let downloadButtonFinishTimer = null;
+let downloadButtonTimeout = null;
+let activeDownloadOriginalHTML = null;
+let activeDownloadMediaKey = null;
+let completedDownloadButton = null;
+let completedDownloadOriginalHTML = null;
+let completedDownloadMediaKey = null;
+let completedDownloadObserver = null;
+let completedDownloadCheckTimer = null;
+
+function getDownloadButtonMediaKey(button) {
+    if (button.matches('.IG_DWPROFILE')) return location.pathname;
+    const isStoryButton = button.matches('.IG_DWSTORY, .IG_DWSTORY_THUMBNAIL, .IG_DWHISTORY, .IG_DWHISTORY_THUMBNAIL');
+    const isReelButton = button.matches('.IG_REELS, .IG_REELS_THUMBNAIL');
+    if (!isStoryButton && !isReelButton) return location.pathname;
+
+    const sections = Array.from(document.querySelectorAll('body > div section'))
+        .filter(section => section.getClientRects().length > 0);
+    const section = sections.find(item => item.querySelector('video')) ||
+        sections.find(item => Array.from(item.querySelectorAll('img')).some(img => {
+            const rect = img.getBoundingClientRect();
+            return rect.width > 120 && rect.height > 120;
+        }));
+    if (!section) return null;
+
+    const video = section.querySelector('video');
+    const image = Array.from(section.querySelectorAll('img'))
+        .filter(img => img.getClientRects().length > 0)
+        .sort((a, b) => {
+            const ar = a.getBoundingClientRect();
+            const br = b.getBoundingClientRect();
+            return (br.width * br.height) - (ar.width * ar.height);
+        })[0];
+    const mediaURL = video?.currentSrc || video?.getAttribute('src') || video?.poster ||
+        image?.currentSrc || image?.getAttribute('src') || '';
+    const timestamp = section.querySelector('time[datetime]')?.getAttribute('datetime') || '';
+    if (!mediaURL && !timestamp) return null;
+    return [location.pathname, timestamp, mediaURL].join('|');
+}
+
+function resetCompletedDownloadButton() {
+    if (!completedDownloadButton) return;
+    const button = completedDownloadButton;
+    if (button.isConnected) {
+        button.innerHTML = completedDownloadOriginalHTML;
+        delete button.dataset.ihDownloadState;
+        button.removeAttribute('aria-disabled');
+        button.style.pointerEvents = '';
+        button.style.opacity = '';
+    }
+    completedDownloadButton = null;
+    completedDownloadOriginalHTML = null;
+    completedDownloadMediaKey = null;
+    completedDownloadObserver?.disconnect();
+    completedDownloadObserver = null;
+}
+
+function watchCompletedDownloadMedia(button) {
+    completedDownloadButton = button;
+    completedDownloadOriginalHTML = activeDownloadOriginalHTML;
+    completedDownloadMediaKey = activeDownloadMediaKey || getDownloadButtonMediaKey(button);
+    completedDownloadObserver?.disconnect();
+    completedDownloadObserver = new MutationObserver(() => {
+        clearTimeout(completedDownloadCheckTimer);
+        completedDownloadCheckTimer = setTimeout(() => {
+            if (!completedDownloadButton) return;
+            if (!completedDownloadButton.isConnected) {
+                resetCompletedDownloadButton();
+                return;
+            }
+            const currentKey = getDownloadButtonMediaKey(completedDownloadButton);
+            if (currentKey && completedDownloadMediaKey && currentKey !== completedDownloadMediaKey) {
+                resetCompletedDownloadButton();
+            }
+        }, 80);
+    });
+    completedDownloadObserver.observe(document.body, {
+        subtree: true,
+        childList: true,
+        attributes: true,
+        attributeFilter: ['src', 'srcset', 'poster', 'datetime', 'class', 'style']
+    });
+}
+
+function renderDownloadButtonIcon(button, type) {
+    const icons = {
+        loading: '<svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" style="animation: igHelperDownloadSpin 1s linear infinite"><path d="M21 12a9 9 0 1 1-6.2-8.56"/></svg>',
+        success: '<svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 4 4L19 6"/></svg>',
+        error: '<svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 8v5m0 3h.01"/></svg>'
+    };
+    button.innerHTML = icons[type];
+    button.dataset.ihDownloadState = type;
+}
+
+function enableOtherDownloadButtons(except = null) {
+    document.querySelectorAll(DOWNLOAD_BUTTON_SELECTOR).forEach((button) => {
+        if (button === except) return;
+        button.removeAttribute('aria-disabled');
+        button.style.pointerEvents = '';
+        button.style.opacity = '';
+    });
+}
+
+function finishActiveDownloadButton() {
+    const button = activeDownloadButton;
+    if (!button) return;
+
+    clearTimeout(downloadButtonTimeout);
+    clearTimeout(downloadButtonFinishTimer);
+
+    if (activeDownloadCancelled && !activeDownloadFailed) {
+        button.innerHTML = activeDownloadOriginalHTML;
+        delete button.dataset.ihDownloadState;
+        button.removeAttribute('aria-disabled');
+        button.style.pointerEvents = '';
+        button.style.opacity = '';
+        enableOtherDownloadButtons(button);
+    }
+    else if (activeDownloadFailed) {
+        renderDownloadButtonIcon(button, 'error');
+        button.style.opacity = '1';
+        enableOtherDownloadButtons(button);
+        setTimeout(() => {
+            if (button.dataset.ihDownloadState !== 'error') return;
+            button.innerHTML = activeDownloadOriginalHTML;
+            delete button.dataset.ihDownloadState;
+            button.removeAttribute('aria-disabled');
+            button.style.pointerEvents = '';
+            button.style.opacity = '';
+        }, 1600);
+    }
+    else {
+        renderDownloadButtonIcon(button, 'success');
+        button.style.opacity = '1';
+        enableOtherDownloadButtons(button);
+        // Keep the checkmark only while this same media item remains visible.
+        watchCompletedDownloadMedia(button);
+    }
+
+    activeDownloadButton = null;
+    activeDownloadOriginalHTML = null;
+    activeDownloadMediaKey = null;
+    activeDownloadJobs = 0;
+    activeDownloadFailed = false;
+    activeDownloadCancelled = false;
+}
+
+export function setActiveDownloadButton(button) {
+    if (!button || activeDownloadButton || button.getAttribute('aria-disabled') === 'true') return false;
+
+    activeDownloadButton = button;
+    activeDownloadOriginalHTML = button.innerHTML;
+    activeDownloadMediaKey = getDownloadButtonMediaKey(button);
+    activeDownloadJobs = 0;
+    activeDownloadFailed = false;
+    activeDownloadCancelled = false;
+
+    if (!document.getElementById('IG_HELPER_DOWNLOAD_BUTTON_STYLE')) {
+        const style = document.createElement('style');
+        style.id = 'IG_HELPER_DOWNLOAD_BUTTON_STYLE';
+        style.textContent = '@keyframes igHelperDownloadSpin { to { transform: rotate(360deg); } }';
+        document.head.appendChild(style);
+    }
+
+    document.querySelectorAll(DOWNLOAD_BUTTON_SELECTOR).forEach((item) => {
+        item.setAttribute('aria-disabled', 'true');
+        item.style.pointerEvents = 'none';
+        item.style.opacity = '.55';
+    });
+    renderDownloadButtonIcon(button, 'loading');
+
+    // Recover if the upstream operation fails before it reaches saveFiles().
+    downloadButtonTimeout = setTimeout(() => {
+        activeDownloadFailed = true;
+        finishActiveDownloadButton();
+    }, 60000);
+    return true;
+}
+
+function beginDownloadButtonJob() {
+    if (!activeDownloadButton) return;
+    clearTimeout(downloadButtonTimeout);
+    activeDownloadJobs++;
+    clearTimeout(downloadButtonFinishTimer);
+}
+
+function finishDownloadButtonJob(success) {
+    if (!activeDownloadButton) return;
+    if (success === false) activeDownloadFailed = true;
+    if (success === null) activeDownloadCancelled = true;
+    activeDownloadJobs = Math.max(0, activeDownloadJobs - 1);
+    if (activeDownloadJobs === 0) {
+        clearTimeout(downloadButtonFinishTimer);
+        downloadButtonFinishTimer = setTimeout(finishActiveDownloadButton, 500);
+    }
 }
 
 /**
@@ -1694,39 +1905,44 @@ export async function tryHandleDashFromMediaItem({
  * @param {Blob} blob
  * @param {string} filename
  */
-export function triggerDownload(blob, filename) {
-    return new Promise(resolve => {
-        const url = URL.createObjectURL(blob);
-
-        if (USER_SETTING.USE_EXTERNAL_DOWNLOAD_MODE) {
-            GM_download({
-                url: url,
-                name: filename,
-                onload: () => {
+export function triggerDownload(blob, filename, directoryHandle = null, username = '') {
+    return new Promise((resolve, reject) => {
+        const useBrowserDownload = () => {
+            const url = URL.createObjectURL(blob);
+            if (USER_SETTING.USE_EXTERNAL_DOWNLOAD_MODE) {
+                GM_download({
+                    url,
+                    name: filename,
+                    onload: () => { URL.revokeObjectURL(url); resolve(); },
+                    onerror: (err) => { URL.revokeObjectURL(url); reject(err || new Error('Download failed')); },
+                });
+            }
+            else {
+                const link = document.createElement("a");
+                link.href = url;
+                link.download = filename;
+                link.rel = "noopener";
+                link.style.display = "none";
+                document.body.appendChild(link);
+                link.click();
+                setTimeout(() => {
+                    // eslint-disable-next-line no-unused-vars
+                    try { document.body.removeChild(link); } catch (e) { /* noop */ }
                     URL.revokeObjectURL(url);
                     resolve();
-                },
-                onerror: () => {
-                    URL.revokeObjectURL(url);
-                    resolve();
-                },
-            });
+                }, 250);
+            }
+        };
+        if (directoryHandle) {
+            writeBlobToDirectory(blob, filename, username, directoryHandle, USER_SETTING.OVERWRITE_EXISTING_FILES)
+                .then(() => resolve())
+                .catch(err => {
+                    console.error('Saving to the selected folder failed; falling back to the browser download location.', err);
+                    useBrowserDownload();
+                });
+            return;
         }
-        else {
-            const link = document.createElement("a");
-            link.href = url;
-            link.download = filename;
-            link.rel = "noopener";
-            link.style.display = "none";
-            document.body.appendChild(link);
-            link.click();
-            setTimeout(() => {
-                // eslint-disable-next-line no-unused-vars
-                try { document.body.removeChild(link); } catch (e) { /* noop */ }
-                URL.revokeObjectURL(url);
-                resolve();
-            }, 250);
-        }
+        useBrowserDownload();
     });
 }
 
@@ -1759,7 +1975,7 @@ export function getSaveFileName(downloadLink, metadata) {
      */
     if (USER_SETTING.MATCH_VIDEO_FILENAME_TO_THUMBNAIL && (filetype === 'mp4' || filetype === 'm4a') && thumbnailURL) {
         const thumbnailName = new URL(thumbnailURL).pathname.split('/').at(-1).split('.').slice(0, -1).join('.');
-        return username + '_' + thumbnailName + '.' + filetype;
+        return (shortcode ? shortcode + '-' : '') + thumbnailName + '.' + filetype;
     }
 
     timestamp = parseInt(timestamp.toString().padEnd(13, '0'));
@@ -1780,7 +1996,7 @@ export function getSaveFileName(downloadLink, metadata) {
     });
 
     var replacements = {
-        '%USERNAME%': username,
+        '%USERNAME%': '',
         '%SOURCE_TYPE%': sourceType,
         '%SHORTCODE%': shortcode || '',
         '%YEAR%': year,
@@ -1803,9 +2019,9 @@ export function getSaveFileName(downloadLink, metadata) {
         }
 
         return replacements[str];
-    });
+    }).replace(/^-+/, '').replace(/-+$/, '');
 
-    const originally = username + '_' + original_name + '.' + filetype;
+    const originally = (shortcode ? shortcode + '-' : '') + original_name + '.' + filetype;
     const downloadName = USER_SETTING.AUTO_RENAME ? filename + '.' + filetype : originally;
 
     return downloadName;
@@ -1828,7 +2044,7 @@ export function getSaveFileName(downloadLink, metadata) {
  * @param  {String|null}  metadata.uid
  * @return {void}
  */
-export async function createSaveFileElement(downloadLink, object, metadata) {
+export async function createSaveFileElement(downloadLink, object, metadata, directoryHandle = null) {
     let { username, sourceType, filetype, shortcode } = metadata;
 
     if (metadata.uid == null) {
@@ -1857,15 +2073,14 @@ export async function createSaveFileElement(downloadLink, object, metadata) {
     ) {
         try {
             const newBlob = await changeExifData(object, metadata);
-            await triggerDownload(newBlob, downloadName);
+            await triggerDownload(newBlob, downloadName, directoryHandle, username);
         } catch (err) {
             console.error('Failed to strip EXIF and/or attach post URL to EXIF.', err);
-            await triggerDownload(object, downloadName);
+            await triggerDownload(object, downloadName, directoryHandle, username);
         }
-        return;
     }
     else {
-        await triggerDownload(object, downloadName);
+        await triggerDownload(object, downloadName, directoryHandle, username);
     }
 }
 
@@ -2340,6 +2555,12 @@ export function logger(...messages) {
  * @return {void}
  */
 export function initSettings() {
+    const legacyRenameFormat = '%USERNAME%-%SOURCE_TYPE%-%SHORTCODE%-%YEAR%%MONTH%%DAY%_%HOUR%%MINUTE%%SECOND%_%ORIGINAL_NAME_FIRST%';
+    if (state.fileRenameFormat === legacyRenameFormat) {
+        state.fileRenameFormat = DEFAULT_RENAME_FORMAT;
+        GM_setValue('G_RENAME_FORMAT', DEFAULT_RENAME_FORMAT);
+    }
+
     for (const [legacyName, currentName] of Object.entries(LEGACY_SETTING_MIGRATIONS)) {
         const legacyValue = GM_getValue(legacyName);
         if (GM_getValue(currentName) == null && typeof legacyValue === 'boolean') {
