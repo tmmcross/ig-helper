@@ -1776,7 +1776,7 @@ export async function tryHandleDashFromMediaItem({
  * @param {string} filename
  */
 export function triggerDownload(blob, filename, directoryHandle = null, username = '') {
-    return new Promise(resolve => {
+    return new Promise((resolve, reject) => {
         const useBrowserDownload = () => {
             const url = URL.createObjectURL(blob);
             if (USER_SETTING.USE_EXTERNAL_DOWNLOAD_MODE) {
@@ -1784,7 +1784,7 @@ export function triggerDownload(blob, filename, directoryHandle = null, username
                     url,
                     name: filename,
                     onload: () => { URL.revokeObjectURL(url); resolve(); },
-                    onerror: () => { URL.revokeObjectURL(url); resolve(); },
+                    onerror: (err) => { URL.revokeObjectURL(url); reject(err || new Error('Download failed')); },
                 });
             }
             else {
