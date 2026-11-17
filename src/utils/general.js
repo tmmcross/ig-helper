@@ -1333,10 +1333,10 @@ export function setDownloadProgress(now, total) {
 export function saveFiles(downloadLink, metadata) {
     // Invoke the folder picker before deferred work; it requires transient user activation.
     const directoryPromise = getDirectoryHandleForSave();
-    beginDownloadNotice();
+    beginDownloadButtonJob();
     return new Promise(resolve => {
         const finish = (success) => {
-            finishDownloadNotice(success);
+            finishDownloadButtonJob(success);
             resolve(success);
         };
         setTimeout(async () => {
@@ -1387,79 +1387,116 @@ export function saveFiles(downloadLink, metadata) {
 }
 
 /**
- * Download status toast shared by concurrent and batch downloads.
+ * Reflect the current download state on the originating download icon.
+ * Batch downloads share one button state until all saveFiles() calls finish.
  */
-let activeDownloadNotices = 0;
-let failedDownloadNotices = 0;
-let downloadNoticeElement = null;
-let downloadNoticeTimer = null;
+const DOWNLOAD_BUTTON_SELECTOR = '.IG_DWSTORY, .IG_DWSTORY_ALL, .IG_DWSTORY_THUMBNAIL, .IG_DWPROFILE, .IG_DWHISTORY, .IG_DWHISTORY_ALL, .IG_DWHISTORY_THUMBNAIL, .IG_REELS, .IG_REELS_THUMBNAIL';
+let activeDownloadButton = null;
+let activeDownloadJobs = 0;
+let activeDownloadFailed = false;
+let activeDownloadCancelled = false;
+let downloadButtonFinishTimer = null;
+let downloadButtonTimeout = null;
+let activeDownloadOriginalHTML = null;
 
-function showDownloadNotice(message, isError = false) {
-    if (!downloadNoticeElement) {
-        downloadNoticeElement = document.createElement('div');
-        downloadNoticeElement.id = 'IG_HELPER_DOWNLOAD_NOTICE';
-        Object.assign(downloadNoticeElement.style, {
-            position: 'fixed',
-            right: '20px',
-            bottom: '24px',
-            zIndex: '2147483647',
-            padding: '10px 16px',
-            borderRadius: '8px',
-            background: 'rgba(32, 32, 32, 0.94)',
-            color: '#fff',
-            fontSize: '14px',
-            lineHeight: '1.4',
-            fontWeight: '600',
-            boxShadow: '0 2px 12px rgba(0,0,0,.25)',
-            pointerEvents: 'none',
-            opacity: '0',
-            transition: 'opacity .15s ease'
-        });
-        document.body.appendChild(downloadNoticeElement);
-    }
-    downloadNoticeElement.textContent = message;
-    downloadNoticeElement.style.background = isError ? 'rgba(170, 35, 35, .96)' : 'rgba(32, 32, 32, .94)';
-    downloadNoticeElement.style.opacity = '1';
+function renderDownloadButtonIcon(button, type) {
+    const icons = {
+        loading: '<svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M21 12a9 9 0 1 1-6.2-8.56"/></svg>',
+        success: '<svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 4 4L19 6"/></svg>',
+        error: '<svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 8v5m0 3h.01"/></svg>'
+    };
+    button.innerHTML = icons[type];
+    button.dataset.ihDownloadState = type;
 }
 
-function beginDownloadNotice() {
-    if (activeDownloadNotices === 0) failedDownloadNotices = 0;
-    activeDownloadNotices++;
-    clearTimeout(downloadNoticeTimer);
-    showDownloadNotice('保存中…');
+function enableOtherDownloadButtons(except = null) {
+    document.querySelectorAll(DOWNLOAD_BUTTON_SELECTOR).forEach((button) => {
+        if (button === except) return;
+        button.removeAttribute('aria-disabled');
+        button.style.pointerEvents = '';
+        button.style.opacity = '';
+    });
 }
 
-function finishDownloadNotice(success) {
-    activeDownloadNotices = Math.max(0, activeDownloadNotices - 1);
-    if (success === false) failedDownloadNotices++;
-    if (activeDownloadNotices > 0) {
-        showDownloadNotice('保存中…');
-        return;
+function finishActiveDownloadButton() {
+    const button = activeDownloadButton;
+    if (!button) return;
+
+    clearTimeout(downloadButtonTimeout);
+    clearTimeout(downloadButtonFinishTimer);
+
+    if (activeDownloadCancelled && !activeDownloadFailed) {
+        button.innerHTML = activeDownloadOriginalHTML;
+        delete button.dataset.ihDownloadState;
+        button.removeAttribute('aria-disabled');
+        button.style.pointerEvents = '';
+        button.style.opacity = '';
+        enableOtherDownloadButtons(button);
     }
-    if (success === null) {
-        if (downloadNoticeElement) {
-            downloadNoticeElement.style.opacity = '0';
-            downloadNoticeTimer = setTimeout(() => {
-                downloadNoticeElement?.remove();
-                downloadNoticeElement = null;
-            }, 180);
-        }
-        return;
+    else if (activeDownloadFailed) {
+        renderDownloadButtonIcon(button, 'error');
+        enableOtherDownloadButtons(button);
+        setTimeout(() => {
+            if (button.dataset.ihDownloadState !== 'error') return;
+            button.innerHTML = activeDownloadOriginalHTML;
+            delete button.dataset.ihDownloadState;
+            button.removeAttribute('aria-disabled');
+            button.style.pointerEvents = '';
+            button.style.opacity = '';
+        }, 1600);
+    }
+    else {
+        renderDownloadButtonIcon(button, 'success');
+        enableOtherDownloadButtons(button);
+        // Keep the completed button disabled and checked until the page is reloaded.
     }
 
-    const failed = failedDownloadNotices;
-    showDownloadNotice(failed ? '保存に失敗しました' : '保存しました！', failed > 0);
-    downloadNoticeTimer = setTimeout(() => {
-        if (activeDownloadNotices === 0 && downloadNoticeElement) {
-            downloadNoticeElement.style.opacity = '0';
-            setTimeout(() => {
-                if (activeDownloadNotices === 0 && downloadNoticeElement) {
-                    downloadNoticeElement.remove();
-                    downloadNoticeElement = null;
-                }
-            }, 180);
-        }
-    }, 2200);
+    activeDownloadButton = null;
+    activeDownloadOriginalHTML = null;
+    activeDownloadJobs = 0;
+    activeDownloadFailed = false;
+    activeDownloadCancelled = false;
+}
+
+export function setActiveDownloadButton(button) {
+    if (!button || activeDownloadButton || button.getAttribute('aria-disabled') === 'true') return false;
+
+    activeDownloadButton = button;
+    activeDownloadOriginalHTML = button.innerHTML;
+    activeDownloadJobs = 0;
+    activeDownloadFailed = false;
+    activeDownloadCancelled = false;
+
+    document.querySelectorAll(DOWNLOAD_BUTTON_SELECTOR).forEach((item) => {
+        item.setAttribute('aria-disabled', 'true');
+        item.style.pointerEvents = 'none';
+        item.style.opacity = '.55';
+    });
+    renderDownloadButtonIcon(button, 'loading');
+
+    // Recover if the upstream operation fails before it reaches saveFiles().
+    downloadButtonTimeout = setTimeout(() => {
+        activeDownloadFailed = true;
+        finishActiveDownloadButton();
+    }, 90000);
+    return true;
+}
+
+function beginDownloadButtonJob() {
+    if (!activeDownloadButton) return;
+    activeDownloadJobs++;
+    clearTimeout(downloadButtonFinishTimer);
+}
+
+function finishDownloadButtonJob(success) {
+    if (!activeDownloadButton) return;
+    if (success === false) activeDownloadFailed = true;
+    if (success === null) activeDownloadCancelled = true;
+    activeDownloadJobs = Math.max(0, activeDownloadJobs - 1);
+    if (activeDownloadJobs === 0) {
+        clearTimeout(downloadButtonFinishTimer);
+        downloadButtonFinishTimer = setTimeout(finishActiveDownloadButton, 500);
+    }
 }
 
 /**
@@ -1915,8 +1952,6 @@ export function getSaveFileName(downloadLink, metadata) {
  * @return {void}
  */
 export async function createSaveFileElement(downloadLink, object, metadata, directoryHandle = null) {
-    beginDownloadNotice();
-    let noticeSuccess = false;
     try {
         let { username, sourceType, filetype, shortcode } = metadata;
 
@@ -1955,10 +1990,8 @@ export async function createSaveFileElement(downloadLink, object, metadata, dire
     else {
         await triggerDownload(object, downloadName, directoryHandle, username);
     }
-        noticeSuccess = true;
     }
     finally {
-        finishDownloadNotice(noticeSuccess);
     }
 }
 
