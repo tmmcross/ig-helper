@@ -2,6 +2,7 @@ import { locale_manifest, PARENT_CHILD_MAPPING, DOWNLOAD_OPTIONS, state, SVG, US
 import { callNotification, getPlatformModifierKey, logger, reloadScript } from "./general";
 import { _i18n } from "./i18n";
 import { showRenameFormatEditor } from "./rename_format";
+import { getDownloadDirectoryName } from "./download_destination";
 /*! ESLINT IMPORT END !*/
 
 /**
@@ -256,6 +257,26 @@ export function showSetting() {
     $destinationSelect.val(DOWNLOAD_OPTIONS.destinationMode);
     $destinationRow.append($destinationSelect);
     $downloadOptions.append($destinationRow);
+
+    const $folderRow = $('<div class="globalSettings ih-download-folder-row"></div>');
+    const $folderStatus = $('<span class="ih-download-folder-status">保存先フォルダ：未選択</span>');
+    const $folderButton = $('<button type="button" class="ih-select-download-folder">フォルダを選択</button>');
+    if (typeof window.showDirectoryPicker !== 'function') {
+        $folderButton.prop('disabled', true);
+        $folderStatus.text('このブラウザはフォルダ指定に対応していません');
+        $destinationSelect.find('option[value="folder"]').prop('disabled', true);
+        if (DOWNLOAD_OPTIONS.destinationMode === 'folder') {
+            $destinationSelect.val('browser');
+            DOWNLOAD_OPTIONS.destinationMode = 'browser';
+            GM_setValue(DOWNLOAD_OPTION_STORAGE_KEYS.destinationMode, 'browser');
+        }
+    } else {
+        getDownloadDirectoryName().then(name => {
+            if (name) $folderStatus.text('保存先フォルダ：' + name);
+        }).catch(error => console.error('Failed to load download folder:', error));
+    }
+    $folderRow.append($folderStatus, $folderButton);
+    $downloadOptions.append($folderRow);
 
     const $collisionRow = $('<label class="globalSettings"></label>');
     $collisionRow.append($('<span>同名ファイルの処理</span>'));
