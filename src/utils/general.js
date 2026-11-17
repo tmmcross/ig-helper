@@ -1747,7 +1747,7 @@ export async function triggerDownload(blob, filename) {
         document.body.appendChild(link);
         link.click();
         setTimeout(() => {
-            try { document.body.removeChild(link); } catch (e) { /* noop */ }
+            try { document.body.removeChild(link); } catch { /* noop */ }
             URL.revokeObjectURL(url);
         }, 250);
     }
