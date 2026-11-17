@@ -9,7 +9,8 @@ import {
     getVisibleStoryTimestamp, getCurrentStoryItemIndex,
     getMediaIdOfStoryOrHighlightFromEmbeddedJSON, getVisibleImageMediaId,
     resolveMediaIdOfStoryOrHighlightByTimestamp, getStoryButtonContainer,
-    markContainerPositioned, updateStoryThumbnailButton, getVisibleVideoPosterMediaIds
+    markContainerPositioned, updateStoryThumbnailButton, getVisibleVideoPosterMediaIds,
+    getBestCandidateUrl
 } from "../utils/general";
 import { getUserId, getStories, isReelsMediaVideo } from "../utils/api";
 import { _i18n } from "../utils/i18n";
@@ -46,11 +47,7 @@ export async function createStoryListDOM(obj, type) {
                 timestamp = item.taken_at_timestamp || item.taken_at;
             }
 
-            item.image_versions2.candidates.sort(function (a, b) {
-                if (a.width < b.width) return 1;
-                if (a.width > b.width) return -1;
-                return 0;
-            });
+            item.image_versions2.candidates.sort((a, b) => (b.height || 0) - (a.height || 0));
 
             if (item.is_video || item.video_versions != null) {
                 $selector.append(`<a media-id="${item.id}" datetime="${timestamp}" data-blob="true" data-needed="direct" data-name="${type}" data-type="mp4" data-username="${username}" data-path="${item.id}" data-globalIndex="${idx + 1}" href="javascript:;" data-href="${item.video_versions[0].url}"><img width="100" src="${item.image_versions2.candidates[0].url}" /><br/>- <span data-ih-locale-title="VID">${_i18n("VID")}</span> ${idx} -</a>`);
@@ -121,11 +118,7 @@ export async function onStoryAll() {
                         timestamp = item.taken_at_timestamp || item.taken_at;
                     }
 
-                    item.image_versions2.candidates.sort(function (a, b) {
-                        if (a.width < b.width) return 1;
-                        if (a.width > b.width) return -1;
-                        return 0;
-                    });
+                    item.image_versions2.candidates.sort((a, b) => (b.height || 0) - (a.height || 0));
 
                     if (item.is_video || item.video_versions != null) {
                         saveFiles(item.video_versions[0].url, {
@@ -134,7 +127,7 @@ export async function onStoryAll() {
                             timestamp,
                             filetype: 'mp4',
                             shortcode: item.id,
-                            thumbnailURL: item.image_versions2?.candidates?.[0]?.url
+                            thumbnailURL: getBestCandidateUrl(item)
                         }).then(() => {
                             setDownloadProgress(++complete, totalItems);
                         });
@@ -518,16 +511,16 @@ export async function onStory(isDownload, isForce, isPreview) {
                             timestamp,
                             filetype: 'mp4',
                             shortcode: mediaId,
-                            thumbnailURL: mediaItem.image_versions2?.candidates?.[0]?.url
+                            thumbnailURL: getBestCandidateUrl(mediaItem)
                         });
                     }
                 }
                 else {
                     if (isPreview) {
-                        openNewTab(mediaItem.image_versions2.candidates[0].url);
+                        openNewTab(getBestCandidateUrl(mediaItem));
                     }
                     else {
-                        saveFiles(mediaItem.image_versions2.candidates[0].url, {
+                        saveFiles(getBestCandidateUrl(mediaItem), {
                             username,
                             sourceType: "stories",
                             timestamp,
