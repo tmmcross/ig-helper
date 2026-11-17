@@ -8,7 +8,8 @@ import {
     updatePopupSelectionSummary, getVisibleStoryTimestamp, getCurrentStoryItemIndex,
     getMediaIdOfStoryOrHighlightFromEmbeddedJSON, getVisibleImageMediaId,
     resolveMediaIdOfStoryOrHighlightByTimestamp, getHighlightButtonContainer,
-    updateHighlightThumbnailButton, getVisibleVideoPosterMediaIds
+    updateHighlightThumbnailButton, getVisibleVideoPosterMediaIds,
+    getBestCandidateUrl
 } from "../utils/general";
 import { _i18n } from "../utils/i18n";
 import { getHighlightStories, isReelsMediaVideo } from "../utils/api";
@@ -69,11 +70,7 @@ export async function onHighlightsStoryAll() {
                         timestamp = item.taken_at_timestamp || item.taken_at;
                     }
 
-                    item.image_versions2.candidates.sort(function (a, b) {
-                        if (a.config_width < b.config_width) return 1;
-                        if (a.config_width > b.config_width) return -1;
-                        return 0;
-                    });
+                    item.image_versions2.candidates.sort((a, b) => (b.height || 0) - (a.height || 0));
 
                     if (item.is_video || item.video_versions != null) {
                         (async () => {
@@ -83,7 +80,7 @@ export async function onHighlightsStoryAll() {
                                 timestamp,
                                 filetype: 'mp4',
                                 shortcode: item.id,
-                                thumbnailURL: item.image_versions2?.candidates?.[0]?.url
+                                thumbnailURL: getBestCandidateUrl(item)
                             });
                             setDownloadProgress(++complete, totalItems);
                         })();
@@ -373,12 +370,12 @@ export async function onHighlightsStory(isDownload, isPreview) {
                         timestamp,
                         filetype: 'mp4',
                         shortcode: mediaId,
-                        thumbnailURL: target.image_versions2?.candidates?.at(-1)?.url || target.image_versions2?.candidates?.[0]?.url || target.display_url || target.display_resources?.at(-1)?.src
+                        thumbnailURL: getBestCandidateUrl(target)
                     });
                 }
             }
             else {
-                const imageUrl = target.image_versions2?.candidates?.at(-1)?.url || target.image_versions2?.candidates?.[0]?.url || target.display_url || target.display_resources?.at(-1)?.src;
+                const imageUrl = getBestCandidateUrl(target);
 
                 if (!imageUrl) {
                     alert('Cannot find highlight image URL.');
@@ -670,10 +667,7 @@ export async function onHighlightsStoryThumbnail(isDownload) {
         }
 
         // Thumbnail is always an image — this must never enter the DASH/video path.
-        const thumbnailURL = target.image_versions2?.candidates?.at(-1)?.url ||
-            target.image_versions2?.candidates?.[0]?.url ||
-            target.display_url ||
-            target.display_resources?.at(-1)?.src;
+        const thumbnailURL = getBestCandidateUrl(target);
 
         if (!thumbnailURL) {
             alert('No highlight thumbnail URL found.');
