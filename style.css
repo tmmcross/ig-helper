@@ -1394,10 +1394,12 @@ div[class]:hover+.volume_slider>div,
 }
 .ih-download-options {
     display: grid;
+    grid-template-columns: minmax(0, 1fr);
     gap: 0;
     padding: 2px 8px 6px;
 }
 .ih-download-setting-row {
+    grid-column: 1 / -1;
     display: grid;
     grid-template-columns: minmax(0, 1fr) minmax(145px, 42%);
     align-items: center;
