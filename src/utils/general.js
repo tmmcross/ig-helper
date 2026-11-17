@@ -6,6 +6,31 @@ import { idToShortcode, registerPostClickHandlers } from "../functions/post";
 import { cleanupPostObservers, stopAllObservers, scheduleRouteCheck } from "../timer";
 /*! ESLINT IMPORT END !*/
 
+/**
+ * getBestCandidateUrl
+ * @description Return the URL from image_versions2.candidates with the largest height.
+ *
+ * @param  {?Object}  item
+ * @return {String}
+ */
+export function getBestCandidateUrl(item) {
+    const candidates = item?.image_versions2?.candidates;
+    if (Array.isArray(candidates) && candidates.length > 0) {
+        const best = candidates.reduce((max, c) => {
+            if (!c?.url) return max;
+            if (!max) return c;
+            if ((c.height || 0) !== (max.height || 0)) {
+                return (c.height || 0) > (max.height || 0) ? c : max;
+            }
+            return (c.width || 0) > (max.width || 0) ? c : max;
+        }, null);
+
+        if (best?.url) return best.url;
+    }
+
+    return item?.display_url || item?.display_resources?.at(-1)?.src || '';
+}
+
 const HASTE_BITMAP_ALPHABET = '0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ-_';
 
 /**
@@ -1639,7 +1664,7 @@ export async function tryHandleDashFromMediaItem({
             return false;
         }
 
-        const thumbnailURL = mediaItem?.image_versions2?.candidates?.[0]?.url || mediaItem?.display_url || mediaItem?.display_resources?.[0]?.src;
+        const thumbnailURL = getBestCandidateUrl(mediaItem);
 
         logger('[DASH]', 'best reps selected', {
             apiKind: 'reels_media',
