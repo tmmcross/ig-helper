@@ -1344,6 +1344,41 @@ div[class]:hover+.volume_slider>div,
 
 
 /* IG Helper+ settings layout */
+.ih-download-folder-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    min-height: 38px;
+    font-size: 14px;
+}
+.ih-download-folder-label {
+    flex: 0 0 auto;
+}
+.ih-download-folder-control {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 8px;
+    min-width: 0;
+}
+.ih-download-folder-path {
+    min-width: 0;
+    overflow: hidden;
+    color: rgb(var(--ig-secondary-text));
+    font-size: 12px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.IG_POPUP_DIG .ih-download-folder-button {
+    flex: 0 0 auto;
+    padding: 5px 9px;
+    font-size: 12px;
+}
+.IG_POPUP_DIG .ih-download-folder-button:disabled {
+    opacity: .5;
+    cursor: not-allowed;
+}
 .ih-settings-section {
     margin: 14px 0 18px;
 }
