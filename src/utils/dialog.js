@@ -1,4 +1,4 @@
-import { locale_manifest, PARENT_CHILD_MAPPING, DOWNLOAD_OPTIONS, DOWNLOAD_OPTION_STORAGE_KEYS, state, SVG, USER_SETTING, $body } from "../settings";
+import { locale_manifest, PARENT_CHILD_MAPPING, state, SVG, USER_SETTING, $body } from "../settings";
 import { callNotification, getPlatformModifierKey, logger, reloadScript } from "./general";
 import { _i18n } from "./i18n";
 import { showRenameFormatEditor } from "./rename_format";
@@ -233,68 +233,9 @@ export function showSetting() {
 
     const $popupBody = $('.IG_POPUP_DIG .IG_POPUP_DIG_BODY');
 
-    // Download and filename-related options share one section with filename metadata settings.
-    $popupBody.append('<section class="ih-settings-section"><h3>保存・ファイル名・メタデータ</h3><div class="ih-download-options"></div></section>');
-    const $filenameSection = $popupBody.find('.ih-settings-section').last();
-    const $downloadOptions = $filenameSection.find('.ih-download-options');
-
-    // UI only: folder selection and save-location dialog behavior will be wired up later.
-    const $folderRow = $('<label class="globalSettings"></label>');
-    $folderRow.append('<span>保存フォルダ</span>');
-    $folderRow.append('<span>未指定（ダウンロード時に選択）</span>');
-    $folderRow.append('<button type="button" disabled>フォルダを選択</button>');
-    $downloadOptions.append($folderRow);
-
-    const optionRows = [
-        {
-            key: 'saveLocationDialog',
-            label: '保存場所確認ウインドウ',
-            options: [
-                ['show', '表示する'],
-                ['skip', '省略する']
-            ]
-        },
-        {
-            key: 'filenameMode',
-            label: 'ファイル名',
-            options: [
-                ['media_id', 'メディアIDのみ'],
-                ['fork', 'Fork元のファイル名']
-            ]
-        },
-        {
-            key: 'usernamePlacement',
-            label: 'ユーザー名の扱い',
-            options: [
-                ['subfolder', 'サブフォルダ'],
-                ['filename', 'ファイル名に付加']
-            ]
-        },
-        {
-            key: 'collisionMode',
-            label: '同名ファイルの処理',
-            options: [
-                ['overwrite', '上書き'],
-                ['suffix', '連番を付ける'],
-                ['skip', 'スキップ']
-            ]
-        }
-    ];
-
-    optionRows.forEach(({ key, label, options }) => {
-        const $row = $('<label class="globalSettings"></label>');
-        $row.append($('<span></span>').text(label));
-        const $select = $('<select class="ih-download-option"></select>')
-            .attr('data-option', key)
-            .attr('aria-label', label);
-        options.forEach(([value, text]) => {
-            $select.append($('<option></option>').val(value).text(text));
-        });
-        $select.val(DOWNLOAD_OPTIONS[key] || options[0][0]);
-        $row.append($select);
-        $downloadOptions.append($row);
-    });
-
+    // Filename format details are configured from AUTO_RENAME's context menu.
+    const $filenameSection = $('<section class="ih-settings-section"><h3>ファイル名・メタデータ</h3></section>');
+    $popupBody.append($filenameSection);
 
     const settingGroups = [
         { title: 'ダウンロード動作', names: ['DIRECT_DOWNLOAD_ALL', 'DIRECT_DOWNLOAD_STORY', 'DIRECT_DOWNLOAD_VISIBLE_RESOURCE', 'FORCE_FETCH_ALL_RESOURCES', 'USE_EXTERNAL_DOWNLOAD_MODE'] },
@@ -369,15 +310,6 @@ export function showSetting() {
         $section.append($items);
         $popupBody.append($section);
     }
-
-    const updateFilenameModeControls = () => {
-        const isForkFilename = DOWNLOAD_OPTIONS.filenameMode === 'fork';
-        $popupBody.find('input#AUTO_RENAME, input#RENAME_PUBLISH_DATE')
-            .prop('disabled', !isForkFilename)
-            .closest('label')
-            .toggleClass('is-disabled', !isForkFilename);
-    };
-    updateFilenameModeControls();
 
     arrangeSettingHierarchy();
 }
