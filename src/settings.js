@@ -26,20 +26,6 @@ export const USER_SETTING = {
     'USE_EXTERNAL_DOWNLOAD_MODE': false
 };
 
-export const DOWNLOAD_OPTIONS = {
-    saveLocationDialog: 'show',     // 'show' | 'skip' (UI preference; behavior added later)
-    filenameMode: 'media_id',       // 'media_id' | 'fork'
-    usernamePlacement: 'subfolder', // 'subfolder' | 'filename'
-    collisionMode: 'skip'           // 'overwrite' | 'suffix' | 'skip'
-};
-
-export const DOWNLOAD_OPTION_STORAGE_KEYS = {
-    saveLocationDialog: 'G_SAVE_LOCATION_DIALOG',
-    filenameMode: 'G_DOWNLOAD_FILENAME_MODE',
-    usernamePlacement: 'G_DOWNLOAD_USERNAME_PLACEMENT',
-    collisionMode: 'G_DOWNLOAD_COLLISION_MODE'
-};
-
 export const PARENT_CHILD_MAPPING = {
     'AUTO_RENAME': [
         'RENAME_PUBLISH_DATE'
