@@ -233,9 +233,10 @@ export function showSetting() {
 
     const $popupBody = $('.IG_POPUP_DIG .IG_POPUP_DIG_BODY');
 
-    // Download naming options are kept separate from the legacy boolean settings.
-    $popupBody.append('<section class="ih-settings-section"><h3>保存・ファイル名</h3><div class="ih-download-options"></div></section>');
-    const $downloadOptions = $popupBody.find('.ih-download-options');
+    // Download and filename-related options share one section with filename metadata settings.
+    $popupBody.append('<section class="ih-settings-section"><h3>保存・ファイル名・メタデータ</h3><div class="ih-download-options"></div></section>');
+    const $filenameSection = $popupBody.find('.ih-settings-section').last();
+    const $downloadOptions = $filenameSection.find('.ih-download-options');
     const optionRows = [
         {
             key: 'filenameMode',
@@ -283,7 +284,6 @@ export function showSetting() {
 
     const settingGroups = [
         { title: 'ダウンロード動作', names: ['DIRECT_DOWNLOAD_ALL', 'DIRECT_DOWNLOAD_STORY', 'DIRECT_DOWNLOAD_VISIBLE_RESOURCE', 'FORCE_FETCH_ALL_RESOURCES', 'USE_EXTERNAL_DOWNLOAD_MODE'] },
-        { title: 'ファイル名・メタデータ', names: ['AUTO_RENAME', 'RENAME_PUBLISH_DATE', 'MATCH_VIDEO_FILENAME_TO_THUMBNAIL', 'MODIFY_RESOURCE_EXIF', 'CAPTURE_IMAGE_VIA_MEDIA_CACHE'] },
         { title: 'ストーリー・リール', names: ['PREFER_DASH_MANIFEST_FOR_STORIES_AND_HIGHLIGHTS', 'NEW_TAB_OPEN_HIGHEST_VIDEO_VIA_GRAPHQL', 'REDIRECT_CLICK_USER_STORY_PICTURE', 'SKIP_VIEW_STORY_CONFIRM', 'SKIP_SHARED_WITH_YOU_DIALOG'] },
         { title: '動画・表示', names: ['DISABLE_VIDEO_LOOPING', 'HTML5_VIDEO_CONTROL', 'MODIFY_VIDEO_VOLUME', 'SCROLL_BUTTON'] },
         { title: 'その他', names: ['CHECK_FOR_UPDATE'] }
@@ -323,6 +323,11 @@ export function showSetting() {
             });
         }
     }
+
+    const $filenameSettings = $('<div class="ih-settings-items"></div>');
+    ['AUTO_RENAME', 'RENAME_PUBLISH_DATE', 'MATCH_VIDEO_FILENAME_TO_THUMBNAIL', 'MODIFY_RESOURCE_EXIF', 'CAPTURE_IMAGE_VIA_MEDIA_CACHE']
+        .forEach(name => appendBooleanSetting($filenameSettings, name));
+    $filenameSection.append($filenameSettings);
 
     settingGroups.forEach(({ title, names }) => {
         const $section = $('<section class="ih-settings-section"></section>');
