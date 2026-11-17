@@ -350,7 +350,7 @@ $(function () {
     });
 
     // Show per-button progress/result feedback when downloads run without a save dialog.
-    $body.on('click', '.IG_DW_MAIN, .IG_DWSTORY, .IG_DWHISTORY, .IG_REELS, .IG_DWPROFILE', function () {
+    $body.on('click', '.IG_DW_MAIN, .IG_DW_ALL_MAIN, .IG_DWSTORY, .IG_DWSTORY_ALL, .IG_DWHISTORY, .IG_DWHISTORY_ALL, .IG_REELS, .IG_DWPROFILE', function () {
         beginDownloadButtonStatus(this);
     });
 
