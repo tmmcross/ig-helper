@@ -2,7 +2,7 @@ import { state, USER_SETTING, DOWNLOAD_OPTIONS, DOWNLOAD_OPTION_STORAGE_KEYS, $b
 import {
     reloadScript,
     triggerLinkElement, openNewTab, saveFiles, logger, updatePopupSelectionSummary,
-    replaceSameOriginHost
+    replaceSameOriginHost, beginDownloadButtonStatus
 } from "./utils/general";
 import { onStory, onStoryAll, onStoryThumbnail } from "./functions/story";
 import { onStoryTaggedProfiles } from "./functions/storyTaggedProfiles";
@@ -347,6 +347,11 @@ $(function () {
                 filetype: 'jpg',
                 shortcode: postPath
             });
+    });
+
+    // Show per-button progress/result feedback when downloads run without a save dialog.
+    $body.on('click', '.IG_DW_MAIN, .IG_DWSTORY, .IG_DWHISTORY, .IG_REELS, .IG_DWPROFILE', function () {
+        beginDownloadButtonStatus(this);
     });
 
     // Running if user left-click download icon in stories
