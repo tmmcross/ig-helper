@@ -1,5 +1,5 @@
 // ==UserScript==
-// @name               IG Helper
+// @name               IG Helper+
 // @name:ar            أداة IG
 // @name:de            IG-Helfer
 // @name:es            Ayudante de IG
@@ -16,8 +16,8 @@
 // @name:vi            Trợ lý IG
 // @name:zh-CN         IG小助手
 // @name:zh-TW         IG小精靈
-// @namespace          https://github.snkms.com/
-// @version            5.4.4
+// @namespace          https://github.com/tmmcross/ig-helper/
+// @version            5.4.4.1
 // @description        Download photos and videos from Instagram posts in one click, including Stories, Reels, and profile pictures.
 // @description:ar     نزّل صورًا ومقاطع فيديو من منشورات Instagram بنقرة واحدة، بما في ذلك القصص وReels وصور الملف الشخصي.
 // @description:de     Lade Fotos und Videos aus Instagram-Beiträgen mit einem Klick herunter, einschließlich Stories, Reels und Profilbildern.
@@ -55,7 +55,9 @@
 // @require            https://code.jquery.com/jquery-4.0.0.min.js#sha256-OaVG6prZf4v69dPg6PhVattBXkcOWQB62pdZ3ORyrao=
 // @resource           INTERNAL_CSS https://cdn.jsdelivr.net/gh/SN-Koarashi/ig-helper@master/style.css
 // @resource           LOCALE_MANIFEST https://cdn.jsdelivr.net/gh/SN-Koarashi/ig-helper@master/locale/manifest.json
-// @supportURL         https://github.com/SN-Koarashi/ig-helper/
+// @supportURL         https://github.com/tmmcross/ig-helper/issues
+// @updateURL          https://raw.githubusercontent.com/tmmcross/ig-helper/master/main.js
+// @downloadURL        https://raw.githubusercontent.com/tmmcross/ig-helper/master/main.js
 // @contributionURL    https://ko-fi.com/snkoarashi
 // @icon               https://www.google.com/s2/favicons?domain=www.instagram.com&sz=32
 // @compatible         chrome >= 100
