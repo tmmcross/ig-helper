@@ -1398,6 +1398,7 @@ let activeDownloadCancelled = false;
 let downloadButtonFinishTimer = null;
 let downloadButtonTimeout = null;
 let activeDownloadOriginalHTML = null;
+let activeDownloadMediaKey = null;
 let completedDownloadButton = null;
 let completedDownloadOriginalHTML = null;
 let completedDownloadMediaKey = null;
@@ -1412,11 +1413,21 @@ function getDownloadButtonMediaKey(button) {
 
     const sections = Array.from(document.querySelectorAll('body > div section'))
         .filter(section => section.getClientRects().length > 0);
-    const section = sections.find(item => item.querySelector('video, img'));
+    const section = sections.find(item => item.querySelector('video')) ||
+        sections.find(item => Array.from(item.querySelectorAll('img')).some(img => {
+            const rect = img.getBoundingClientRect();
+            return rect.width > 120 && rect.height > 120;
+        }));
     if (!section) return null;
 
     const video = section.querySelector('video');
-    const image = section.querySelector('img');
+    const image = Array.from(section.querySelectorAll('img'))
+        .filter(img => img.getClientRects().length > 0)
+        .sort((a, b) => {
+            const ar = a.getBoundingClientRect();
+            const br = b.getBoundingClientRect();
+            return (br.width * br.height) - (ar.width * ar.height);
+        })[0];
     const mediaURL = video?.currentSrc || video?.getAttribute('src') || video?.poster ||
         image?.currentSrc || image?.getAttribute('src') || '';
     const timestamp = section.querySelector('time[datetime]')?.getAttribute('datetime') || '';
@@ -1444,7 +1455,7 @@ function resetCompletedDownloadButton() {
 function watchCompletedDownloadMedia(button) {
     completedDownloadButton = button;
     completedDownloadOriginalHTML = activeDownloadOriginalHTML;
-    completedDownloadMediaKey = getDownloadButtonMediaKey(button);
+    completedDownloadMediaKey = activeDownloadMediaKey || getDownloadButtonMediaKey(button);
     completedDownloadObserver?.disconnect();
     completedDownloadObserver = new MutationObserver(() => {
         clearTimeout(completedDownloadCheckTimer);
@@ -1525,6 +1536,7 @@ function finishActiveDownloadButton() {
 
     activeDownloadButton = null;
     activeDownloadOriginalHTML = null;
+    activeDownloadMediaKey = null;
     activeDownloadJobs = 0;
     activeDownloadFailed = false;
     activeDownloadCancelled = false;
@@ -1535,6 +1547,7 @@ export function setActiveDownloadButton(button) {
 
     activeDownloadButton = button;
     activeDownloadOriginalHTML = button.innerHTML;
+    activeDownloadMediaKey = getDownloadButtonMediaKey(button);
     activeDownloadJobs = 0;
     activeDownloadFailed = false;
     activeDownloadCancelled = false;
