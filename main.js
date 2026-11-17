@@ -86,6 +86,7 @@
         'FORCE_FETCH_ALL_RESOURCES': true,
         'HTML5_VIDEO_CONTROL': false,
         'MODIFY_RESOURCE_EXIF': false,
+        'OVERWRITE_EXISTING_FILES': false,
         'MODIFY_VIDEO_VOLUME': false,
         'PREFER_DASH_MANIFEST_FOR_STORIES_AND_HIGHLIGHTS': false,
         'NEW_TAB_OPEN_HIGHEST_VIDEO_VIA_GRAPHQL': false,
@@ -8602,7 +8603,7 @@
         return filename + ' (' + index + ')';
     }
 
-    async function writeBlobToDirectory(blob, filename, username, rootHandle) {
+    async function writeBlobToDirectory(blob, filename, username, rootHandle, overwriteExisting = false) {
         const userFolderName = sanitizePathSegment(username, 'unknown_user');
         const safeFilename = sanitizePathSegment(filename, 'download');
         const userDirectory = await rootHandle.getDirectoryHandle(userFolderName, { create: true });
@@ -8610,13 +8611,22 @@
         let index = 1;
         let reservation = '';
 
-        while (true) {
+        if (overwriteExisting) {
             reservation = userFolderName + '/' + candidate;
-            if (!reservedDownloadPaths.has(reservation)) {
-                const exists = await fileExists(userDirectory, candidate);
-                if (!exists && !reservedDownloadPaths.has(reservation)) break;
+            while (reservedDownloadPaths.has(reservation)) {
+                candidate = addCollisionSuffix(safeFilename, index++);
+                reservation = userFolderName + '/' + candidate;
             }
-            candidate = addCollisionSuffix(safeFilename, index++);
+        }
+        else {
+            while (true) {
+                reservation = userFolderName + '/' + candidate;
+                if (!reservedDownloadPaths.has(reservation)) {
+                    const exists = await fileExists(userDirectory, candidate);
+                    if (!exists && !reservedDownloadPaths.has(reservation)) break;
+                }
+                candidate = addCollisionSuffix(safeFilename, index++);
+            }
         }
 
         reservedDownloadPaths.add(reservation);
@@ -8703,6 +8713,75 @@
     let downloadButtonFinishTimer = null;
     let downloadButtonTimeout = null;
     let activeDownloadOriginalHTML = null;
+    let completedDownloadButton = null;
+    let completedDownloadOriginalHTML = null;
+    let completedDownloadMediaKey = null;
+    let completedDownloadObserver = null;
+    let completedDownloadCheckTimer = null;
+
+    function getDownloadButtonMediaKey(button) {
+        if (button.matches('.IG_DWPROFILE')) return location.pathname;
+        const isStoryButton = button.matches('.IG_DWSTORY, .IG_DWSTORY_THUMBNAIL, .IG_DWHISTORY, .IG_DWHISTORY_THUMBNAIL');
+        const isReelButton = button.matches('.IG_REELS, .IG_REELS_THUMBNAIL');
+        if (!isStoryButton && !isReelButton) return location.pathname;
+
+        const sections = Array.from(document.querySelectorAll('body > div section'))
+            .filter(section => section.getClientRects().length > 0);
+        const section = sections.find(item => item.querySelector('video, img'));
+        if (!section) return null;
+
+        const video = section.querySelector('video');
+        const image = section.querySelector('img');
+        const mediaURL = video?.currentSrc || video?.getAttribute('src') || video?.poster ||
+            image?.currentSrc || image?.getAttribute('src') || '';
+        const timestamp = section.querySelector('time[datetime]')?.getAttribute('datetime') || '';
+        if (!mediaURL && !timestamp) return null;
+        return [location.pathname, timestamp, mediaURL].join('|');
+    }
+
+    function resetCompletedDownloadButton() {
+        if (!completedDownloadButton) return;
+        const button = completedDownloadButton;
+        if (button.isConnected) {
+            button.innerHTML = completedDownloadOriginalHTML;
+            delete button.dataset.ihDownloadState;
+            button.removeAttribute('aria-disabled');
+            button.style.pointerEvents = '';
+            button.style.opacity = '';
+        }
+        completedDownloadButton = null;
+        completedDownloadOriginalHTML = null;
+        completedDownloadMediaKey = null;
+        completedDownloadObserver?.disconnect();
+        completedDownloadObserver = null;
+    }
+
+    function watchCompletedDownloadMedia(button) {
+        completedDownloadButton = button;
+        completedDownloadOriginalHTML = activeDownloadOriginalHTML;
+        completedDownloadMediaKey = getDownloadButtonMediaKey(button);
+        completedDownloadObserver?.disconnect();
+        completedDownloadObserver = new MutationObserver(() => {
+            clearTimeout(completedDownloadCheckTimer);
+            completedDownloadCheckTimer = setTimeout(() => {
+                if (!completedDownloadButton) return;
+                if (!completedDownloadButton.isConnected) {
+                    resetCompletedDownloadButton();
+                    return;
+                }
+                const currentKey = getDownloadButtonMediaKey(completedDownloadButton);
+                if (currentKey && completedDownloadMediaKey && currentKey !== completedDownloadMediaKey) {
+                    resetCompletedDownloadButton();
+                }
+            }, 80);
+        });
+        completedDownloadObserver.observe(document.body, {
+            subtree: true,
+            childList: true,
+            attributes: true,
+            attributeFilter: ['src', 'srcset', 'poster', 'datetime', 'class', 'style']
+        });
+    }
 
     function renderDownloadButtonIcon(button, type) {
         const icons = {
@@ -8755,7 +8834,8 @@
             renderDownloadButtonIcon(button, 'success');
             button.style.opacity = '1';
             enableOtherDownloadButtons(button);
-            // Keep the completed button disabled and checked until the page is reloaded.
+            // Keep the checkmark only while this same media item remains visible.
+            watchCompletedDownloadMedia(button);
         }
 
         activeDownloadButton = null;
@@ -9156,7 +9236,7 @@
                 }
             };
             if (directoryHandle) {
-                writeBlobToDirectory(blob, filename, username, directoryHandle)
+                writeBlobToDirectory(blob, filename, username, directoryHandle, USER_SETTING.OVERWRITE_EXISTING_FILES)
                     .then(() => resolve())
                     .catch(err => {
                         console.error('Saving to the selected folder failed; falling back to the browser download location.', err);
@@ -11339,6 +11419,8 @@
                 "DIRECT_DOWNLOAD_STORY": "Directly Download All Resources in the Story/Highlight",
                 "MODIFY_VIDEO_VOLUME": "Modify Video Volume (Right-Click to Set)",
                 "MODIFY_RESOURCE_EXIF": "Modify Resource EXIF Properties",
+            "OVERWRITE_EXISTING_FILES": "Overwrite Existing Files",
+            "OVERWRITE_EXISTING_FILES_INTRO": "When enabled, a file with the same name in the selected download folder will be replaced. When disabled, a numbered suffix is added instead.",
                 "SCROLL_BUTTON": "Enable Scroll Buttons for Reels Page",
                 "PREFER_DASH_MANIFEST_FOR_STORIES_AND_HIGHLIGHTS": "Prefer DASH Manifest for Higher-Quality Story/Highlight Video",
                 "NEW_TAB_OPEN_HIGHEST_VIDEO_VIA_GRAPHQL": "Open the Highest-Quality Story/Highlight Video in New Tab (Without Audio)",
