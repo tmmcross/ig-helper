@@ -76,7 +76,39 @@ function normalizeRelativePath(filename) {
     return segments;
 }
 
-export async function writeBlobToDownloadDirectory(blob, filename) {
+async function fileExists(directory, filename) {
+    try {
+        await directory.getFileHandle(filename);
+        return true;
+    } catch (error) {
+        if (error?.name === 'NotFoundError') return false;
+        throw error;
+    }
+}
+
+function addNumericSuffix(filename, number) {
+    const dot = filename.lastIndexOf('.');
+    const hasExtension = dot > 0;
+    const basename = hasExtension ? filename.slice(0, dot) : filename;
+    const extension = hasExtension ? filename.slice(dot) : '';
+    return `${basename} (${number})${extension}`;
+}
+
+async function resolveCollisionName(directory, filename, collisionMode) {
+    if (collisionMode === 'overwrite') return filename;
+    if (!(await fileExists(directory, filename))) return filename;
+    if (collisionMode === 'skip') return null;
+
+    let number = 1;
+    let candidate;
+    do {
+        candidate = addNumericSuffix(filename, number++);
+    } while (await fileExists(directory, candidate));
+
+    return candidate;
+}
+
+export async function writeBlobToDownloadDirectory(blob, filename, collisionMode = 'skip') {
     const handle = await getDownloadDirectoryHandle();
     if (!handle) {
         throw new Error('保存先フォルダが選択されていません。設定画面からフォルダを選択してください。');
@@ -93,7 +125,13 @@ export async function writeBlobToDownloadDirectory(blob, filename) {
         directory = await directory.getDirectoryHandle(segment, { create: true });
     }
 
-    const fileHandle = await directory.getFileHandle(segments[segments.length - 1], { create: true });
+    const requestedName = segments[segments.length - 1];
+    const resolvedName = await resolveCollisionName(directory, requestedName, collisionMode);
+    if (resolvedName === null) {
+        return { saved: false, skipped: true, filename: requestedName };
+    }
+
+    const fileHandle = await directory.getFileHandle(resolvedName, { create: true });
     const writable = await fileHandle.createWritable();
     try {
         await writable.write(blob);
@@ -102,4 +140,6 @@ export async function writeBlobToDownloadDirectory(blob, filename) {
         try { await writable.abort(); } catch { /* best effort */ }
         throw error;
     }
+
+    return { saved: true, skipped: false, filename: resolvedName };
 }
