@@ -4,7 +4,12 @@ on:
   push:
     branches:
       - feature/ig-helper-plus-foundation
+    paths-ignore:
+      - main.js
   workflow_dispatch:
+
+permissions:
+  contents: write
 
 jobs:
   build:
@@ -28,6 +33,16 @@ jobs:
 
       - name: Run ESLint
         run: npx eslint main.js --quiet
+
+      - name: Commit generated main.js to feature branch
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add main.js
+          if ! git diff --cached --quiet; then
+            git commit -m "Build userscript for feature branch testing"
+            git push origin HEAD:feature/ig-helper-plus-foundation
+          fi
 
       - name: Upload testable userscript
         uses: actions/upload-artifact@v4
