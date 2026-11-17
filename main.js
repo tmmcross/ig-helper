@@ -8607,10 +8607,15 @@
                     shortcode &&
                     sourceType === 'photo';
 
-                if (USER_SETTING.USE_EXTERNAL_DOWNLOAD_MODE && DOWNLOAD_OPTIONS.destinationMode !== "folder" && !needsExifRewrite) {
+                if (
+                    (DOWNLOAD_OPTIONS.saveLocationDialog === 'show' ||
+                        (USER_SETTING.USE_EXTERNAL_DOWNLOAD_MODE && DOWNLOAD_OPTIONS.destinationMode !== "folder")) &&
+                    !needsExifRewrite
+                ) {
                     GM_download({
                         url: downloadLink,
                         name: downloadName,
+                        ...(DOWNLOAD_OPTIONS.saveLocationDialog === 'show' ? { saveAs: true } : {}),
                         onload: () => {
                             updateLoadingBar(false);
                             resolve(true);
@@ -8963,16 +8968,20 @@
         }
 
         const url = URL.createObjectURL(blob);
-        if (USER_SETTING.USE_EXTERNAL_DOWNLOAD_MODE) {
-            await new Promise(resolve => {
-                GM_download({
-                    url,
-                    name: filename,
-                    onload: resolve,
-                    onerror: resolve
+        if (DOWNLOAD_OPTIONS.saveLocationDialog === 'show' || USER_SETTING.USE_EXTERNAL_DOWNLOAD_MODE) {
+            try {
+                await new Promise(resolve => {
+                    GM_download({
+                        url,
+                        name: filename,
+                        ...(DOWNLOAD_OPTIONS.saveLocationDialog === 'show' ? { saveAs: true } : {}),
+                        onload: resolve,
+                        onerror: resolve
+                    });
                 });
-            });
-            URL.revokeObjectURL(url);
+            } finally {
+                URL.revokeObjectURL(url);
+            }
         }
         else {
             const link = document.createElement("a");
@@ -10061,7 +10070,7 @@
 
         const $saveLocationRow = $(`
             <label class="globalSettings">
-                <span>保存場所確認ウインドウ</span>
+                <span>保存時にダイアログを表示</span>
                 <input id="ih-save-location-dialog" type="checkbox" ${DOWNLOAD_OPTIONS.saveLocationDialog === 'show' ? 'checked' : ''}>
                 <div class="chbtn"><div class="rounds"></div></div>
             </label>
