@@ -8792,12 +8792,13 @@
         downloadButtonTimeout = setTimeout(() => {
             activeDownloadFailed = true;
             finishActiveDownloadButton();
-        }, 600000);
+        }, 60000);
         return true;
     }
 
     function beginDownloadButtonJob() {
         if (!activeDownloadButton) return;
+        clearTimeout(downloadButtonTimeout);
         activeDownloadJobs++;
         clearTimeout(downloadButtonFinishTimer);
     }
