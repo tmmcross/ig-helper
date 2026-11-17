@@ -7096,6 +7096,110 @@
         return false;
     }
 
+    const DB_NAME = 'IG_HELPER_DOWNLOAD_DESTINATION';
+    const DB_VERSION = 1;
+    const STORE_NAME = 'DESTINATION';
+    const HANDLE_KEY = 'directoryHandle';
+
+    function openDestinationDB() {
+        return new Promise((resolve, reject) => {
+            const request = indexedDB.open(DB_NAME, DB_VERSION);
+            request.onupgradeneeded = () => {
+                if (!request.result.objectStoreNames.contains(STORE_NAME)) {
+                    request.result.createObjectStore(STORE_NAME);
+                }
+            };
+            request.onsuccess = () => resolve(request.result);
+            request.onerror = () => reject(request.error);
+            request.onblocked = () => reject(new Error('Download destination database is blocked'));
+        });
+    }
+
+    async function storeDirectoryHandle(handle) {
+        const db = await openDestinationDB();
+        try {
+            await new Promise((resolve, reject) => {
+                const transaction = db.transaction(STORE_NAME, 'readwrite');
+                transaction.objectStore(STORE_NAME).put(handle, HANDLE_KEY);
+                transaction.oncomplete = resolve;
+                transaction.onerror = () => reject(transaction.error);
+                transaction.onabort = () => reject(transaction.error || new Error('Saving folder handle was aborted'));
+            });
+        } finally {
+            db.close();
+        }
+    }
+
+    async function getDownloadDirectoryHandle() {
+        const db = await openDestinationDB();
+        try {
+            return await new Promise((resolve, reject) => {
+                const request = db.transaction(STORE_NAME, 'readonly').objectStore(STORE_NAME).get(HANDLE_KEY);
+                request.onsuccess = () => resolve(request.result || null);
+                request.onerror = () => reject(request.error);
+            });
+        } finally {
+            db.close();
+        }
+    }
+
+    async function selectDownloadDirectory() {
+        if (typeof window.showDirectoryPicker !== 'function') {
+            throw new Error('このブラウザはフォルダ選択に対応していません。');
+        }
+
+        const handle = await window.showDirectoryPicker({ mode: 'readwrite' });
+        const permission = await handle.requestPermission({ mode: 'readwrite' });
+        if (permission !== 'granted') {
+            throw new Error('選択したフォルダへの書き込みが許可されませんでした。');
+        }
+
+        await storeDirectoryHandle(handle);
+        return handle;
+    }
+
+    async function getDownloadDirectoryName() {
+        const handle = await getDownloadDirectoryHandle();
+        return handle?.name || '';
+    }
+
+    function normalizeRelativePath(filename) {
+        const segments = String(filename).replace(/\\/g, '/').split('/')
+            .filter(segment => segment && segment !== '.' && segment !== '..');
+        if (!segments.length) {
+            throw new Error('保存するファイル名が空です。');
+        }
+        return segments;
+    }
+
+    async function writeBlobToDownloadDirectory(blob, filename) {
+        const handle = await getDownloadDirectoryHandle();
+        if (!handle) {
+            throw new Error('保存先フォルダが選択されていません。設定画面からフォルダを選択してください。');
+        }
+
+        const permission = await handle.queryPermission({ mode: 'readwrite' });
+        if (permission !== 'granted') {
+            throw new Error('保存先フォルダへのアクセス権がありません。設定画面からフォルダを選択し直してください。');
+        }
+
+        const segments = normalizeRelativePath(filename);
+        let directory = handle;
+        for (const segment of segments.slice(0, -1)) {
+            directory = await directory.getDirectoryHandle(segment, { create: true });
+        }
+
+        const fileHandle = await directory.getFileHandle(segments[segments.length - 1], { create: true });
+        const writable = await fileHandle.createWritable();
+        try {
+            await writable.write(blob);
+            await writable.close();
+        } catch (error) {
+            try { await writable.abort(); } catch { /* best effort */ }
+            throw error;
+        }
+    }
+
     /**
      * getBestCandidateUrl
      * @description Return the URL from image_versions2.candidates with the largest height.
@@ -8463,7 +8567,7 @@
                     shortcode &&
                     sourceType === 'photo';
 
-                if (USER_SETTING.USE_EXTERNAL_DOWNLOAD_MODE && !needsExifRewrite) {
+                if (USER_SETTING.USE_EXTERNAL_DOWNLOAD_MODE && DOWNLOAD_OPTIONS.destinationMode !== "folder" && !needsExifRewrite) {
                     GM_download({
                         url: downloadLink,
                         name: downloadName,
@@ -8809,40 +8913,37 @@
      * @param {Blob} blob
      * @param {string} filename
      */
-    function triggerDownload(blob, filename) {
-        return new Promise(resolve => {
-            const url = URL.createObjectURL(blob);
+    async function triggerDownload(blob, filename) {
+        if (DOWNLOAD_OPTIONS.destinationMode === "folder") {
+            await writeBlobToDownloadDirectory(blob, filename);
+            return;
+        }
 
-            if (USER_SETTING.USE_EXTERNAL_DOWNLOAD_MODE) {
+        const url = URL.createObjectURL(blob);
+        if (USER_SETTING.USE_EXTERNAL_DOWNLOAD_MODE) {
+            await new Promise(resolve => {
                 GM_download({
-                    url: url,
+                    url,
                     name: filename,
-                    onload: () => {
-                        URL.revokeObjectURL(url);
-                        resolve();
-                    },
-                    onerror: () => {
-                        URL.revokeObjectURL(url);
-                        resolve();
-                    },
+                    onload: resolve,
+                    onerror: resolve
                 });
-            }
-            else {
-                const link = document.createElement("a");
-                link.href = url;
-                link.download = filename;
-                link.rel = "noopener";
-                link.style.display = "none";
-                document.body.appendChild(link);
-                link.click();
-                setTimeout(() => {
-                    // eslint-disable-next-line no-unused-vars
-                    try { document.body.removeChild(link); } catch (e) { /* noop */ }
-                    URL.revokeObjectURL(url);
-                    resolve();
-                }, 250);
-            }
-        });
+            });
+            URL.revokeObjectURL(url);
+        }
+        else {
+            const link = document.createElement("a");
+            link.href = url;
+            link.download = filename;
+            link.rel = "noopener";
+            link.style.display = "none";
+            document.body.appendChild(link);
+            link.click();
+            setTimeout(() => {
+                try { document.body.removeChild(link); } catch { /* noop */ }
+                URL.revokeObjectURL(url);
+            }, 250);
+        }
     }
 
     /**
@@ -9933,6 +10034,26 @@
         $destinationSelect.val(DOWNLOAD_OPTIONS.destinationMode);
         $destinationRow.append($destinationSelect);
         $downloadOptions.append($destinationRow);
+
+        const $folderRow = $('<div class="globalSettings ih-download-folder-row"></div>');
+        const $folderStatus = $('<span class="ih-download-folder-status">保存先フォルダ：未選択</span>');
+        const $folderButton = $('<button type="button" class="ih-select-download-folder">フォルダを選択</button>');
+        if (typeof window.showDirectoryPicker !== 'function') {
+            $folderButton.prop('disabled', true);
+            $folderStatus.text('このブラウザはフォルダ指定に対応していません');
+            $destinationSelect.find('option[value="folder"]').prop('disabled', true);
+            if (DOWNLOAD_OPTIONS.destinationMode === 'folder') {
+                $destinationSelect.val('browser');
+                DOWNLOAD_OPTIONS.destinationMode = 'browser';
+                GM_setValue(DOWNLOAD_OPTION_STORAGE_KEYS.destinationMode, 'browser');
+            }
+        } else {
+            getDownloadDirectoryName().then(name => {
+                if (name) $folderStatus.text('保存先フォルダ：' + name);
+            }).catch(error => console.error('Failed to load download folder:', error));
+        }
+        $folderRow.append($folderStatus, $folderButton);
+        $downloadOptions.append($folderRow);
 
         const $collisionRow = $('<label class="globalSettings"></label>');
         $collisionRow.append($('<span>同名ファイルの処理</span>'));
@@ -11401,13 +11522,41 @@
             }
         });
 
-        $body.on('change', '.IG_POPUP_DIG select.ih-download-option', function () {
+        $body.on('click', '.IG_POPUP_DIG .ih-select-download-folder', async function (e) {
+            e.preventDefault();
+            const $button = $(this);
+            $button.prop('disabled', true);
+            try {
+                const handle = await selectDownloadDirectory();
+                DOWNLOAD_OPTIONS.destinationMode = 'folder';
+                GM_setValue(DOWNLOAD_OPTION_STORAGE_KEYS.destinationMode, 'folder');
+                $('.IG_POPUP_DIG select[data-option="destinationMode"]').val('folder');
+                $('.IG_POPUP_DIG .ih-download-folder-status').text('保存先フォルダ：' + handle.name);
+            } catch (error) {
+                if (error?.name !== 'AbortError') {
+                    console.error('Folder selection failed:', error);
+                    alert(error?.message || '保存先フォルダを選択できませんでした。');
+                }
+            } finally {
+                $button.prop('disabled', false);
+            }
+        });
+
+        $body.on('change', '.IG_POPUP_DIG select.ih-download-option', async function () {
             const $select = $(this);
             const option = $select.attr('data-option');
             const value = $select.val();
 
             if (option === 'destinationMode') {
                 if (!['browser', 'folder'].includes(value)) return;
+                if (value === 'folder') {
+                    const folderName = await getDownloadDirectoryName().catch(() => '');
+                    if (!folderName) {
+                        alert('先に「フォルダを選択」から保存先を指定してください。');
+                        $select.val('browser');
+                        return;
+                    }
+                }
                 DOWNLOAD_OPTIONS.destinationMode = value;
                 GM_setValue(DOWNLOAD_OPTION_STORAGE_KEYS.destinationMode, value);
                 return;
