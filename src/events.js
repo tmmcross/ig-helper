@@ -13,6 +13,7 @@ import { _i18n, getTranslationText, repaintingTranslations } from "./utils/i18n"
 import { getImageFromCache, registerPerformanceObserver } from "./utils/image_cache";
 import { batchDownloadPostFiles, shortcodeToId } from "./functions/post";
 import { registerMenuCommand, showDebugDOM, showHotkeySetting, showSetting } from "./utils/dialog";
+import { selectDownloadDirectory, getDownloadDirectoryName } from "./utils/download_destination";
 /*! ESLINT IMPORT END !*/
 
 // Running if document is ready
@@ -159,13 +160,41 @@ $(function () {
         }
     });
 
-    $body.on('change', '.IG_POPUP_DIG select.ih-download-option', function () {
+    $body.on('click', '.IG_POPUP_DIG .ih-select-download-folder', async function (e) {
+        e.preventDefault();
+        const $button = $(this);
+        $button.prop('disabled', true);
+        try {
+            const handle = await selectDownloadDirectory();
+            DOWNLOAD_OPTIONS.destinationMode = 'folder';
+            GM_setValue(DOWNLOAD_OPTION_STORAGE_KEYS.destinationMode, 'folder');
+            $('.IG_POPUP_DIG select[data-option="destinationMode"]').val('folder');
+            $('.IG_POPUP_DIG .ih-download-folder-status').text('保存先フォルダ：' + handle.name);
+        } catch (error) {
+            if (error?.name !== 'AbortError') {
+                console.error('Folder selection failed:', error);
+                alert(error?.message || '保存先フォルダを選択できませんでした。');
+            }
+        } finally {
+            $button.prop('disabled', false);
+        }
+    });
+
+    $body.on('change', '.IG_POPUP_DIG select.ih-download-option', async function () {
         const $select = $(this);
         const option = $select.attr('data-option');
         const value = $select.val();
 
         if (option === 'destinationMode') {
             if (!['browser', 'folder'].includes(value)) return;
+            if (value === 'folder') {
+                const folderName = await getDownloadDirectoryName().catch(() => '');
+                if (!folderName) {
+                    alert('先に「フォルダを選択」から保存先を指定してください。');
+                    $select.val('browser');
+                    return;
+                }
+            }
             DOWNLOAD_OPTIONS.destinationMode = value;
             GM_setValue(DOWNLOAD_OPTION_STORAGE_KEYS.destinationMode, value);
             return;
