@@ -97,7 +97,7 @@ export async function writeBlobToDownloadDirectory(blob, filename) {
         await writable.write(blob);
         await writable.close();
     } catch (error) {
-        try { await writable.abort(); } catch (abortError) { /* best effort */ }
+        try { await writable.abort(); } catch { /* best effort */ }
         throw error;
     }
 }
