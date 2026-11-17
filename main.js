@@ -38,7 +38,7 @@
 // @connect            raw.githubusercontent.com
 // @require            https://cdn.jsdelivr.net/npm/mediabunny@1.34.5/dist/bundles/mediabunny.min.cjs#sha256-wUFR+x2bDvpqgMAVGy2CvGvULyjTGvGy4UUAm8rae5U=
 // @require            https://code.jquery.com/jquery-4.0.0.min.js#sha256-OaVG6prZf4v69dPg6PhVattBXkcOWQB62pdZ3ORyrao=
-// @resource           INTERNAL_CSS https://cdn.jsdelivr.net/gh/SN-Koarashi/ig-helper@master/style.css
+// @resource           INTERNAL_CSS https://cdn.jsdelivr.net/gh/tmmcross/ig-helper@master/style.css
 // @resource           LOCALE_MANIFEST https://cdn.jsdelivr.net/gh/SN-Koarashi/ig-helper@master/locale/manifest.json
 // @supportURL         https://github.com/tmmcross/ig-helper/issues
 // @updateURL          https://raw.githubusercontent.com/tmmcross/ig-helper/master/main.js
@@ -82,6 +82,17 @@
         'SKIP_VIEW_STORY_CONFIRM': false,
         'SKIP_SHARED_WITH_YOU_DIALOG': false,
         'USE_EXTERNAL_DOWNLOAD_MODE': false
+    };
+
+    const DOWNLOAD_OPTIONS = {
+        filenameMode: 'media_id',
+        usernamePlacement: 'subfolder',
+        collisionMode: 'skip'
+    };
+    const DOWNLOAD_OPTION_STORAGE_KEYS = {
+        filenameMode: 'G_DOWNLOAD_FILENAME_MODE',
+        usernamePlacement: 'G_DOWNLOAD_USERNAME_PLACEMENT',
+        collisionMode: 'G_DOWNLOAD_COLLISION_MODE'
     };
 
     const PARENT_CHILD_MAPPING = {
@@ -9457,6 +9468,19 @@
                 }
             }
         }
+
+        const allowedDownloadOptions = {
+            filenameMode: ['media_id', 'fork'],
+            usernamePlacement: ['subfolder', 'filename'],
+            collisionMode: ['overwrite', 'suffix', 'skip']
+        };
+
+        for (const [name, allowedValues] of Object.entries(allowedDownloadOptions)) {
+            const storedValue = GM_getValue(DOWNLOAD_OPTION_STORAGE_KEYS[name]);
+            if (allowedValues.includes(storedValue)) {
+                DOWNLOAD_OPTIONS[name] = storedValue;
+            }
+        }
     }
 
 
@@ -9872,7 +9896,6 @@
                 </div>
             `);
 
-        // OPTIMIZATION: cache the lang select once
         const $langSelect = $('#langSelect');
         for (const o in locale_manifest) {
             $langSelect.append(
@@ -9882,12 +9905,44 @@
 
         const $popupBody = $('.IG_POPUP_DIG .IG_POPUP_DIG_BODY');
 
-        for (const name in USER_SETTING) {
-            $popupBody.append(`
+        $popupBody.append('<section class="ih-settings-section"><h3>保存・ファイル名</h3><div class="ih-download-options"></div></section>');
+        const $downloadOptions = $popupBody.find('.ih-download-options');
+        const optionRows = [
+            { key: 'filenameMode', label: 'ファイル名', options: [['media_id', 'メディアIDのみ'], ['fork', 'Fork元のファイル名']] },
+            { key: 'usernamePlacement', label: 'ユーザー名の扱い', options: [['subfolder', 'サブフォルダ'], ['filename', 'ファイル名に付加']] },
+            { key: 'collisionMode', label: '同名ファイルの処理', options: [['overwrite', '上書き'], ['suffix', '連番を付ける'], ['skip', 'スキップ']] }
+        ];
+
+        optionRows.forEach(({ key, label, options }) => {
+            const $row = $('<label class="ih-download-setting-row"></label>');
+            $row.append($('<span></span>').text(label));
+            const $select = $('<select class="ih-download-option"></select>')
+                .attr('data-option', key)
+                .attr('aria-label', label);
+            options.forEach(([value, text]) => {
+                $select.append($('<option></option>').val(value).text(text));
+            });
+            $select.val(DOWNLOAD_OPTIONS[key]);
+            $row.append($select);
+            $downloadOptions.append($row);
+        });
+
+        $downloadOptions.append('<p class="ih-settings-note">保存先は現在、ブラウザ標準のダウンロード先です。</p>');
+        $downloadOptions.append('<p class="ih-settings-note">「Fork元のファイル名」を選ぶと、従来の自動リネーム設定が適用されます。</p>');
+
+        const settingGroups = [
+            { title: 'ダウンロード動作', names: ['DIRECT_DOWNLOAD_ALL', 'DIRECT_DOWNLOAD_STORY', 'DIRECT_DOWNLOAD_VISIBLE_RESOURCE', 'FORCE_FETCH_ALL_RESOURCES', 'USE_EXTERNAL_DOWNLOAD_MODE'] },
+            { title: 'ファイル名・メタデータ', names: ['AUTO_RENAME', 'RENAME_PUBLISH_DATE', 'MATCH_VIDEO_FILENAME_TO_THUMBNAIL', 'MODIFY_RESOURCE_EXIF', 'CAPTURE_IMAGE_VIA_MEDIA_CACHE'] },
+            { title: 'ストーリー・リール', names: ['PREFER_DASH_MANIFEST_FOR_STORIES_AND_HIGHLIGHTS', 'NEW_TAB_OPEN_HIGHEST_VIDEO_VIA_GRAPHQL', 'REDIRECT_CLICK_USER_STORY_PICTURE', 'SKIP_VIEW_STORY_CONFIRM', 'SKIP_SHARED_WITH_YOU_DIALOG'] },
+            { title: '動画・表示', names: ['DISABLE_VIDEO_LOOPING', 'HTML5_VIDEO_CONTROL', 'MODIFY_VIDEO_VOLUME', 'SCROLL_BUTTON'] },
+            { title: 'その他', names: ['CHECK_FOR_UPDATE'] }
+        ];
+
+        function appendBooleanSetting($container, name) {
+            $container.append(`
                 <label class="globalSettings"
                        title="${_i18n(name + '_INTRO')}"
                        data-ih-locale-title="${name + '_INTRO'}">
-
                     <span data-ih-locale="${name}">${_i18n(name)}</span>
                     <input id="${name}" value="box" type="checkbox"
                            ${USER_SETTING[name] === true ? 'checked' : ''}>
@@ -9896,7 +9951,7 @@
             );
 
             if (name === 'MODIFY_VIDEO_VOLUME') {
-                $popupBody.find(`input[id="${name}"]`).parent('label').on('contextmenu', function (e) {
+                $container.find(`input[id="${name}"]`).parent('label').on('contextmenu', function (e) {
                     e.preventDefault();
                     const $this = $(this);
                     if (!$this.find('#tempWrapper').length) {
@@ -9910,14 +9965,41 @@
             }
 
             if (name === 'AUTO_RENAME') {
-                $popupBody.find(`input[id="${name}"]`).parent('label').on('contextmenu', function (e) {
+                $container.find(`input[id="${name}"]`).parent('label').on('contextmenu', function (e) {
                     e.preventDefault();
                     showRenameFormatEditor();
                 });
             }
         }
 
-        $('.IG_POPUP_DIG .IG_POPUP_DIG_BODY input#CHECK_FOR_UPDATE').closest('label').prependTo('.IG_POPUP_DIG .IG_POPUP_DIG_BODY');
+        settingGroups.forEach(({ title, names }) => {
+            const $section = $('<section class="ih-settings-section"></section>');
+            $section.append($('<h3></h3>').text(title));
+            const $items = $('<div class="ih-settings-items"></div>');
+            names.forEach(name => appendBooleanSetting($items, name));
+            $section.append($items);
+            $popupBody.append($section);
+        });
+
+        const assignedSettings = settingGroups.flatMap(group => group.names);
+        const unassignedSettings = Object.keys(USER_SETTING).filter(name => !assignedSettings.includes(name));
+        if (unassignedSettings.length) {
+            const $section = $('<section class="ih-settings-section"></section>');
+            $section.append($('<h3></h3>').text('未分類'));
+            const $items = $('<div class="ih-settings-items"></div>');
+            unassignedSettings.forEach(name => appendBooleanSetting($items, name));
+            $section.append($items);
+            $popupBody.append($section);
+        }
+
+        const updateFilenameModeControls = () => {
+            const isForkFilename = DOWNLOAD_OPTIONS.filenameMode === 'fork';
+            $popupBody.find('input#AUTO_RENAME, input#RENAME_PUBLISH_DATE')
+                .prop('disabled', !isForkFilename)
+                .closest('label')
+                .toggleClass('is-disabled', !isForkFilename);
+        };
+        updateFilenameModeControls();
 
         arrangeSettingHierarchy();
     }
@@ -11298,6 +11380,32 @@
                 }
                 e.preventDefault();
             }
+        });
+
+        $body.on('change', '.IG_POPUP_DIG select.ih-download-option', function () {
+            const $select = $(this);
+            const optionName = $select.attr('data-option');
+            const value = $select.val();
+            const allowedOptions = {
+                filenameMode: ['media_id', 'fork'],
+                usernamePlacement: ['subfolder', 'filename'],
+                collisionMode: ['overwrite', 'suffix', 'skip']
+            };
+
+            if (!allowedOptions[optionName]?.includes(value)) return;
+
+            DOWNLOAD_OPTIONS[optionName] = value;
+            GM_setValue(DOWNLOAD_OPTION_STORAGE_KEYS[optionName], value);
+
+            if (optionName === 'filenameMode') {
+                const isForkFilename = value === 'fork';
+                $('.IG_POPUP_DIG input#AUTO_RENAME, .IG_POPUP_DIG input#RENAME_PUBLISH_DATE')
+                    .prop('disabled', !isForkFilename)
+                    .closest('label')
+                    .toggleClass('is-disabled', !isForkFilename);
+            }
+
+            console.log('download option', optionName, value);
         });
 
         $body.on('change', '.IG_POPUP_DIG input', function () {
