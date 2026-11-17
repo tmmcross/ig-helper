@@ -87,6 +87,7 @@
         'HTML5_VIDEO_CONTROL': false,
         'MODIFY_RESOURCE_EXIF': false,
         'OVERWRITE_EXISTING_FILES': false,
+        'SKIP_EXISTING_FILES': false,
         'MODIFY_VIDEO_VOLUME': false,
         'PREFER_DASH_MANIFEST_FOR_STORIES_AND_HIGHLIGHTS': false,
         'NEW_TAB_OPEN_HIGHEST_VIDEO_VIA_GRAPHQL': false,
@@ -8603,7 +8604,7 @@
         return filename + ' (' + index + ')';
     }
 
-    async function writeBlobToDirectory(blob, filename, username, rootHandle, overwriteExisting = false) {
+    async function writeBlobToDirectory(blob, filename, username, rootHandle, overwriteExisting = false, skipExisting = false) {
         const userFolderName = sanitizePathSegment(username, 'unknown_user');
         const safeFilename = sanitizePathSegment(filename, 'download');
         const userDirectory = await rootHandle.getDirectoryHandle(userFolderName, { create: true });
@@ -8611,7 +8612,11 @@
         let index = 1;
         let reservation = '';
 
-        if (overwriteExisting) {
+        if (skipExisting) {
+            reservation = userFolderName + '/' + candidate;
+            if (reservedDownloadPaths.has(reservation) || await fileExists(userDirectory, candidate)) return null;
+        }
+        else if (overwriteExisting) {
             reservation = userFolderName + '/' + candidate;
             while (reservedDownloadPaths.has(reservation)) {
                 candidate = addCollisionSuffix(safeFilename, index++);
@@ -9249,7 +9254,7 @@
                 }
             };
             if (directoryHandle) {
-                writeBlobToDirectory(blob, filename, username, directoryHandle, USER_SETTING.OVERWRITE_EXISTING_FILES)
+                writeBlobToDirectory(blob, filename, username, directoryHandle, USER_SETTING.OVERWRITE_EXISTING_FILES, USER_SETTING.SKIP_EXISTING_FILES)
                     .then(() => resolve())
                     .catch(err => {
                         console.error('Saving to the selected folder failed; falling back to the browser download location.', err);
@@ -11748,6 +11753,18 @@
                 let isChecked = $this.prop('checked');
                 GM_setValue(name, isChecked);
                 USER_SETTING[name] = isChecked;
+
+                // The overwrite and skip behaviors are mutually exclusive.
+                if (isChecked && name === 'OVERWRITE_EXISTING_FILES') {
+                    USER_SETTING.SKIP_EXISTING_FILES = false;
+                    GM_setValue('SKIP_EXISTING_FILES', false);
+                    $('.IG_POPUP_DIG input#SKIP_EXISTING_FILES').prop('checked', false);
+                }
+                else if (isChecked && name === 'SKIP_EXISTING_FILES') {
+                    USER_SETTING.OVERWRITE_EXISTING_FILES = false;
+                    GM_setValue('OVERWRITE_EXISTING_FILES', false);
+                    $('.IG_POPUP_DIG input#OVERWRITE_EXISTING_FILES').prop('checked', false);
+                }
 
                 if (isChecked) {
                     for (const [parent, children] of Object.entries(PARENT_CHILD_MAPPING)) {
