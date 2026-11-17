@@ -2383,6 +2383,7 @@ export function initSettings() {
     }
 
     const allowedDownloadOptions = {
+        saveLocationDialog: ['show', 'skip'],
         filenameMode: ['media_id', 'fork'],
         usernamePlacement: ['subfolder', 'filename'],
         collisionMode: ['overwrite', 'suffix', 'skip']
