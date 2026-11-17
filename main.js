@@ -135,6 +135,9 @@
     // Icon download by Google Fonts Material Icon & Lucide
     const SVG = {
         DOWNLOAD: '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-download-icon lucide-download"><path d="M12 15V3"/><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m7 10 5 5 5-5"/></svg>',
+        DOWNLOAD_LOADING: '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-loader-circle ih-download-spinner"><path d="M12 2v4"/><path d="m16.2 7.8 2.9-2.9"/><path d="M18 12h4"/><path d="m16.2 16.2 2.9 2.9"/><path d="M12 18v4"/><path d="m4.9 19.1 2.9-2.9"/><path d="M2 12h4"/><path d="m4.9 4.9 2.9 2.9"/></svg>',
+        DOWNLOAD_SUCCESS: '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-check"><path d="m5 12 4 4L19 6"/></svg>',
+        DOWNLOAD_ERROR: '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-x"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>',
         TAGGED_PROFILES: '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-at-sign-icon lucide-at-sign"><circle cx="12" cy="12" r="4"/><path d="M16 8v5a3 3 0 0 0 6 0v-1a10 10 0 1 0-4 8"/></svg>',
         NEW_TAB: '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-external-link-icon lucide-external-link"><path d="M15 3h6v6"/><path d="M10 14 21 3"/><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/></svg>',
         THUMBNAIL: '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-image-icon lucide-image"><rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></svg>',
@@ -8574,6 +8577,43 @@
     }
 
     /**
+     * Update the icon on the download button that initiated the current save operation.
+     * Status feedback is only enabled when the save dialog is disabled.
+     */
+    function beginDownloadButtonStatus(button) {
+        if (DOWNLOAD_OPTIONS.saveLocationDialog === 'show' || !button) return;
+        const $button = $(button);
+        $button.data('ihDownloadPending', 0);
+        $button.data('ihDownloadStarted', false);
+        $button.data('ihDownloadFailed', false);
+        $button.addClass('ih-download-status-active').html(SVG.DOWNLOAD_LOADING);
+    }
+
+    function trackDownloadButtonStart() {
+        if (DOWNLOAD_OPTIONS.saveLocationDialog === 'show') return;
+        $('.ih-download-status-active').each(function () {
+            const $button = $(this);
+            $button.data('ihDownloadStarted', true);
+            $button.data('ihDownloadPending', ($button.data('ihDownloadPending') || 0) + 1);
+        });
+    }
+
+    function trackDownloadButtonFinish(success) {
+        if (DOWNLOAD_OPTIONS.saveLocationDialog === 'show') return;
+        $('.ih-download-status-active').each(function () {
+            const $button = $(this);
+            if (!success) $button.data('ihDownloadFailed', true);
+            const pending = Math.max(0, ($button.data('ihDownloadPending') || 1) - 1);
+            $button.data('ihDownloadPending', pending);
+            if (pending === 0 && $button.data('ihDownloadStarted')) {
+                const failed = $button.data('ihDownloadFailed');
+                $button.removeClass('ih-download-status-active')
+                    .html(failed ? SVG.DOWNLOAD_ERROR : SVG.DOWNLOAD_SUCCESS);
+            }
+        });
+    }
+
+    /**
      * saveFiles
      * @description Download the specified media URL to the computer.
      *
@@ -8589,18 +8629,18 @@
      * @return {Promise}
      */
     function saveFiles(downloadLink, metadata) {
+        trackDownloadButtonStart();
         return new Promise(resolve => {
             setTimeout(() => {
                 updateLoadingBar(true);
 
-                if (metadata?.shortcode?.match(/^\d+$/) != null) {
+                if (metadata?.shortcode?.match(/^\\d+$/) != null) {
                     metadata.shortcode = idToShortcode(metadata.shortcode);
                 }
 
                 const downloadName = getSaveFileName(downloadLink, metadata);
                 const { filetype, shortcode, sourceType } = metadata;
 
-                // JPEG photos that need their EXIF rewritten must go through fetch()
                 const needsExifRewrite =
                     USER_SETTING.MODIFY_RESOURCE_EXIF &&
                     filetype === 'jpg' &&
@@ -8618,26 +8658,38 @@
                         ...(DOWNLOAD_OPTIONS.saveLocationDialog === 'show' ? { saveAs: true } : {}),
                         onload: () => {
                             updateLoadingBar(false);
+                            trackDownloadButtonFinish(true);
                             resolve(true);
                         },
-                        // eslint-disable-next-line no-unused-vars
-                        onerror: (err) => {
+                        onerror: () => {
                             updateLoadingBar(false);
-                            resolve(true);
+                            trackDownloadButtonFinish(false);
+                            resolve(false);
                         },
+                        ontimeout: () => {
+                            updateLoadingBar(false);
+                            trackDownloadButtonFinish(false);
+                            resolve(false);
+                        }
                     });
                 }
                 else {
                     fetch(downloadLink)
-                        .then(res => res.blob())
-                        .then(dwel => {
-                            updateLoadingBar(false);
-                            return createSaveFileElement(downloadLink, dwel, metadata);
+                        .then(res => {
+                            if (!res.ok) throw new Error(`Download request failed: ${res.status}`);
+                            return res.blob();
                         })
-                        .then(() => resolve(true))
+                        .then(dwel => createSaveFileElement(downloadLink, dwel, metadata))
+                        .then(result => {
+                            updateLoadingBar(false);
+                            const success = result !== false;
+                            trackDownloadButtonFinish(success);
+                            resolve(success);
+                        })
                         .catch(err => {
                             updateLoadingBar(false);
                             console.error('saveFiles failed:', err);
+                            trackDownloadButtonFinish(false);
                             resolve(false);
                         });
                 }
@@ -11762,6 +11814,11 @@
                     filetype: 'jpg',
                     shortcode: postPath
                 });
+        });
+
+        // Show per-button progress/result feedback when downloads run without a save dialog.
+        $body.on('click', '.IG_DW_MAIN, .IG_DWSTORY, .IG_DWHISTORY, .IG_REELS, .IG_DWPROFILE', function () {
+            beginDownloadButtonStatus(this);
         });
 
         // Running if user left-click download icon in stories
