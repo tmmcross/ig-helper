@@ -247,6 +247,16 @@ export function showSetting() {
     `);
     $downloadOptions.append($saveLocationRow);
 
+    const $destinationRow = $('<label class="globalSettings"></label>');
+    $destinationRow.append($('<span>保存先の指定方法</span>'));
+    const $destinationSelect = $('<select class="ih-download-option" data-option="destinationMode" aria-label="保存先の指定方法"></select>');
+    [['browser', 'ブラウザのダウンロード先'], ['folder', 'フォルダを選択（File System Access API）']].forEach(([value, label]) => {
+        $destinationSelect.append($('<option></option>').val(value).text(label));
+    });
+    $destinationSelect.val(DOWNLOAD_OPTIONS.destinationMode);
+    $destinationRow.append($destinationSelect);
+    $downloadOptions.append($destinationRow);
+
     const $collisionRow = $('<label class="globalSettings"></label>');
     $collisionRow.append($('<span>同名ファイルの処理</span>'));
     const $collisionSelect = $('<select class="ih-download-option" data-option="collisionMode" aria-label="同名ファイルの処理"></select>');
