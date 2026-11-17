@@ -171,7 +171,7 @@ function addCollisionSuffix(filename, index) {
     return filename + ' (' + index + ')';
 }
 
-export async function writeBlobToDirectory(blob, filename, username, rootHandle, overwriteExisting = false) {
+export async function writeBlobToDirectory(blob, filename, username, rootHandle, overwriteExisting = false, skipExisting = false) {
     const userFolderName = sanitizePathSegment(username, 'unknown_user');
     const safeFilename = sanitizePathSegment(filename, 'download');
     const userDirectory = await rootHandle.getDirectoryHandle(userFolderName, { create: true });
@@ -179,7 +179,11 @@ export async function writeBlobToDirectory(blob, filename, username, rootHandle,
     let index = 1;
     let reservation = '';
 
-    if (overwriteExisting) {
+    if (skipExisting) {
+        reservation = userFolderName + '/' + candidate;
+        if (reservedDownloadPaths.has(reservation) || await fileExists(userDirectory, candidate)) return null;
+    }
+    else if (overwriteExisting) {
         reservation = userFolderName + '/' + candidate;
         while (reservedDownloadPaths.has(reservation)) {
             candidate = addCollisionSuffix(safeFilename, index++);
