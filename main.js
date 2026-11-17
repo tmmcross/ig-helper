@@ -85,11 +85,14 @@
     };
 
     const DOWNLOAD_OPTIONS = {
-        filenameMode: 'media_id',
-        usernamePlacement: 'subfolder',
-        collisionMode: 'skip'
+        saveLocationDialog: 'show',     // 'show' | 'skip' (UI preference; behavior added later)
+        filenameMode: 'media_id',       // 'media_id' | 'fork'
+        usernamePlacement: 'subfolder', // 'subfolder' | 'filename'
+        collisionMode: 'skip'           // 'overwrite' | 'suffix' | 'skip'
     };
+
     const DOWNLOAD_OPTION_STORAGE_KEYS = {
+        saveLocationDialog: 'G_SAVE_LOCATION_DIALOG',
         filenameMode: 'G_DOWNLOAD_FILENAME_MODE',
         usernamePlacement: 'G_DOWNLOAD_USERNAME_PLACEMENT',
         collisionMode: 'G_DOWNLOAD_COLLISION_MODE'
@@ -1382,31 +1385,6 @@
     }
 
     /**
-     * getBestCandidateUrl
-     * @description Return the URL from image_versions2.candidates with the largest height.
-     *
-     * @param  {?Object}  item
-     * @return {String}
-     */
-    function getBestCandidateUrl(item) {
-        const candidates = item?.image_versions2?.candidates;
-        if (Array.isArray(candidates) && candidates.length > 0) {
-            const best = candidates.reduce((max, c) => {
-                if (!c?.url) return max;
-                if (!max) return c;
-                if ((c.height || 0) !== (max.height || 0)) {
-                    return (c.height || 0) > (max.height || 0) ? c : max;
-                }
-                return (c.width || 0) > (max.width || 0) ? c : max;
-            }, null);
-
-            if (best?.url) return best.url;
-        }
-
-        return item?.display_url || item?.display_resources?.at(-1)?.src || '';
-    }
-
-    /**
      * onHighlightsStoryAll
      * @description Trigger user's highlight all download event.
      *
@@ -1453,7 +1431,7 @@
                                     timestamp,
                                     filetype: 'mp4',
                                     shortcode: item.id,
-                                    thumbnailURL: item.image_versions2?.candidates?.[0]?.url
+                                    thumbnailURL: getBestCandidateUrl(item)
                                 });
                                 setDownloadProgress(++complete, totalItems);
                             })();
@@ -5123,7 +5101,7 @@
                                 timestamp,
                                 filetype: 'mp4',
                                 shortcode: item.id,
-                                thumbnailURL: item.image_versions2?.candidates?.[0]?.url
+                                thumbnailURL: getBestCandidateUrl(item)
                             }).then(() => {
                                 setDownloadProgress(++complete, totalItems);
                             });
@@ -5512,12 +5490,11 @@
                         }
                     }
                     else {
-    					const bestStoryImgUrl = getBestCandidateUrl(mediaItem);
                         if (isPreview) {
-                            openNewTab(bestStoryImgUrl);
+                            openNewTab(getBestCandidateUrl(mediaItem));
                         }
                         else {
-                            saveFiles(bestStoryImgUrl, {
+                            saveFiles(getBestCandidateUrl(mediaItem), {
                                 username,
                                 sourceType: "stories",
                                 timestamp,
@@ -5639,7 +5616,10 @@
             let videoThumbnailURL = "";
             let mediaId = null;
             const selectThumbnail = item => {
-                videoThumbnailURL = getBestCandidateUrl(item);
+                const candidates = item?.image_versions2?.candidates || [];
+                const image = candidates.filter(candidate => candidate.url).reduce((best, candidate) =>
+                    !best || candidate.width > best.width ? candidate : best, null);
+                videoThumbnailURL = image?.url || item?.display_url || '';
                 if (videoThumbnailURL) {
                     mediaId = item.pk ?? item.id;
                     if (USER_SETTING.RENAME_PUBLISH_DATE) {
@@ -7116,6 +7096,31 @@
         if (item.video_dash_manifest) return true;
         if (item.media_type != null) return item.media_type !== 1;
         return false;
+    }
+
+    /**
+     * getBestCandidateUrl
+     * @description Return the URL from image_versions2.candidates with the largest height.
+     *
+     * @param  {?Object}  item
+     * @return {String}
+     */
+    function getBestCandidateUrl(item) {
+        const candidates = item?.image_versions2?.candidates;
+        if (Array.isArray(candidates) && candidates.length > 0) {
+            const best = candidates.reduce((max, c) => {
+                if (!c?.url) return max;
+                if (!max) return c;
+                if ((c.height || 0) !== (max.height || 0)) {
+                    return (c.height || 0) > (max.height || 0) ? c : max;
+                }
+                return (c.width || 0) > (max.width || 0) ? c : max;
+            }, null);
+
+            if (best?.url) return best.url;
+        }
+
+        return item?.display_url || item?.display_resources?.at(-1)?.src || '';
     }
 
     const HASTE_BITMAP_ALPHABET = '0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ-_';
@@ -9470,6 +9475,7 @@
         }
 
         const allowedDownloadOptions = {
+            saveLocationDialog: ['show', 'skip'],
             filenameMode: ['media_id', 'fork'],
             usernamePlacement: ['subfolder', 'filename'],
             collisionMode: ['overwrite', 'suffix', 'skip']
@@ -9896,6 +9902,7 @@
                 </div>
             `);
 
+        // OPTIMIZATION: cache the lang select once
         const $langSelect = $('#langSelect');
         for (const o in locale_manifest) {
             $langSelect.append(
@@ -9905,12 +9912,54 @@
 
         const $popupBody = $('.IG_POPUP_DIG .IG_POPUP_DIG_BODY');
 
-        $popupBody.append('<section class="ih-settings-section"><h3>保存・ファイル名</h3><div class="ih-download-options"></div></section>');
-        const $downloadOptions = $popupBody.find('.ih-download-options');
+        // Download and filename-related options share one section with filename metadata settings.
+        $popupBody.append('<section class="ih-settings-section"><h3>保存・ファイル名・メタデータ</h3><div class="ih-download-options"></div></section>');
+        const $filenameSection = $popupBody.find('.ih-settings-section').last();
+        const $downloadOptions = $filenameSection.find('.ih-download-options');
+
+        // UI only: folder selection and save-location dialog behavior will be wired up later.
+        const $folderRow = $('<div class="ih-download-folder-row"></div>');
+        $folderRow.append('<span class="ih-download-folder-label">保存フォルダ</span>');
+        const $folderControl = $('<div class="ih-download-folder-control"></div>');
+        $folderControl.append('<span class="ih-download-folder-path">未指定（ダウンロード時に選択）</span>');
+        $folderControl.append('<button type="button" class="ih-download-folder-button" disabled>フォルダを選択</button>');
+        $folderRow.append($folderControl);
+        $downloadOptions.append($folderRow);
+
         const optionRows = [
-            { key: 'filenameMode', label: 'ファイル名', options: [['media_id', 'メディアIDのみ'], ['fork', 'Fork元のファイル名']] },
-            { key: 'usernamePlacement', label: 'ユーザー名の扱い', options: [['subfolder', 'サブフォルダ'], ['filename', 'ファイル名に付加']] },
-            { key: 'collisionMode', label: '同名ファイルの処理', options: [['overwrite', '上書き'], ['suffix', '連番を付ける'], ['skip', 'スキップ']] }
+            {
+                key: 'saveLocationDialog',
+                label: '保存場所確認ウインドウ',
+                options: [
+                    ['show', '表示する'],
+                    ['skip', '省略する']
+                ]
+            },
+            {
+                key: 'filenameMode',
+                label: 'ファイル名',
+                options: [
+                    ['media_id', 'メディアIDのみ'],
+                    ['fork', 'Fork元のファイル名']
+                ]
+            },
+            {
+                key: 'usernamePlacement',
+                label: 'ユーザー名の扱い',
+                options: [
+                    ['subfolder', 'サブフォルダ'],
+                    ['filename', 'ファイル名に付加']
+                ]
+            },
+            {
+                key: 'collisionMode',
+                label: '同名ファイルの処理',
+                options: [
+                    ['overwrite', '上書き'],
+                    ['suffix', '連番を付ける'],
+                    ['skip', 'スキップ']
+                ]
+            }
         ];
 
         optionRows.forEach(({ key, label, options }) => {
@@ -9922,17 +9971,16 @@
             options.forEach(([value, text]) => {
                 $select.append($('<option></option>').val(value).text(text));
             });
-            $select.val(DOWNLOAD_OPTIONS[key]);
+            $select.val(DOWNLOAD_OPTIONS[key] || options[0][0]);
             $row.append($select);
             $downloadOptions.append($row);
         });
 
-        $downloadOptions.append('<p class="ih-settings-note">保存先は現在、ブラウザ標準のダウンロード先です。</p>');
+        $downloadOptions.append('<p class="ih-settings-note">保存先を指定していない場合は、ダウンロード時に保存場所を選択します。</p>');
         $downloadOptions.append('<p class="ih-settings-note">「Fork元のファイル名」を選ぶと、従来の自動リネーム設定が適用されます。</p>');
 
         const settingGroups = [
             { title: 'ダウンロード動作', names: ['DIRECT_DOWNLOAD_ALL', 'DIRECT_DOWNLOAD_STORY', 'DIRECT_DOWNLOAD_VISIBLE_RESOURCE', 'FORCE_FETCH_ALL_RESOURCES', 'USE_EXTERNAL_DOWNLOAD_MODE'] },
-            { title: 'ファイル名・メタデータ', names: ['AUTO_RENAME', 'RENAME_PUBLISH_DATE', 'MATCH_VIDEO_FILENAME_TO_THUMBNAIL', 'MODIFY_RESOURCE_EXIF', 'CAPTURE_IMAGE_VIA_MEDIA_CACHE'] },
             { title: 'ストーリー・リール', names: ['PREFER_DASH_MANIFEST_FOR_STORIES_AND_HIGHLIGHTS', 'NEW_TAB_OPEN_HIGHEST_VIDEO_VIA_GRAPHQL', 'REDIRECT_CLICK_USER_STORY_PICTURE', 'SKIP_VIEW_STORY_CONFIRM', 'SKIP_SHARED_WITH_YOU_DIALOG'] },
             { title: '動画・表示', names: ['DISABLE_VIDEO_LOOPING', 'HTML5_VIDEO_CONTROL', 'MODIFY_VIDEO_VOLUME', 'SCROLL_BUTTON'] },
             { title: 'その他', names: ['CHECK_FOR_UPDATE'] }
@@ -9943,6 +9991,7 @@
                 <label class="globalSettings"
                        title="${_i18n(name + '_INTRO')}"
                        data-ih-locale-title="${name + '_INTRO'}">
+
                     <span data-ih-locale="${name}">${_i18n(name)}</span>
                     <input id="${name}" value="box" type="checkbox"
                            ${USER_SETTING[name] === true ? 'checked' : ''}>
@@ -9972,6 +10021,11 @@
             }
         }
 
+        const $filenameSettings = $('<div class="ih-settings-items"></div>');
+        ['AUTO_RENAME', 'RENAME_PUBLISH_DATE', 'MATCH_VIDEO_FILENAME_TO_THUMBNAIL', 'MODIFY_RESOURCE_EXIF', 'CAPTURE_IMAGE_VIA_MEDIA_CACHE']
+            .forEach(name => appendBooleanSetting($filenameSettings, name));
+        $filenameSection.append($filenameSettings);
+
         settingGroups.forEach(({ title, names }) => {
             const $section = $('<section class="ih-settings-section"></section>');
             $section.append($('<h3></h3>').text(title));
@@ -9981,7 +10035,14 @@
             $popupBody.append($section);
         });
 
-        const assignedSettings = settingGroups.flatMap(group => group.names);
+        const assignedSettings = [
+            ...settingGroups.flatMap(group => group.names),
+            'AUTO_RENAME',
+            'RENAME_PUBLISH_DATE',
+            'MATCH_VIDEO_FILENAME_TO_THUMBNAIL',
+            'MODIFY_RESOURCE_EXIF',
+            'CAPTURE_IMAGE_VIA_MEDIA_CACHE'
+        ];
         const unassignedSettings = Object.keys(USER_SETTING).filter(name => !assignedSettings.includes(name));
         if (unassignedSettings.length) {
             const $section = $('<section class="ih-settings-section"></section>');
@@ -11387,6 +11448,7 @@
             const optionName = $select.attr('data-option');
             const value = $select.val();
             const allowedOptions = {
+                saveLocationDialog: ['show', 'skip'],
                 filenameMode: ['media_id', 'fork'],
                 usernamePlacement: ['subfolder', 'filename'],
                 collisionMode: ['overwrite', 'suffix', 'skip']
