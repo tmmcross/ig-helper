@@ -1,4 +1,4 @@
-# Instagram Download Helper (IG Helper)
+# IG Helper+
 <div align="center">
   
   [![](https://img.shields.io/badge/Kofi-F16061.svg?logo=ko-fi&logoColor=white)](https://ko-fi.com/F1F1J6VZH)
@@ -7,7 +7,9 @@
   Buy me a coffee, Donate to ig-helper if it makes your help. Your donation makes ig-helper better: [https://ko-fi.com/snkoarashi](https://ko-fi.com/snkoarashi)
 </div>
 
-**Simple and fast download of resources from Instagram (posts, reels, stories, and more).**
+**A customized fork of IG Helper for downloading Instagram posts, Reels, Stories, and profile pictures.**
+
+This repository distributes the userscript as `main.js`. Install it in Tampermonkey from the [raw script URL](https://raw.githubusercontent.com/tmmcross/ig-helper/master/main.js). Updates are delivered through Tampermonkey's standard userscript update mechanism.
 
 ## 🎉 Features
 - Force the fetching of all resources in the post.
