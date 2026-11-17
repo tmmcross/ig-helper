@@ -1464,7 +1464,7 @@ function watchCompletedDownloadMedia(button) {
         subtree: true,
         childList: true,
         attributes: true,
-        attributeFilter: ['src', 'srcset', 'poster', 'datetime']
+        attributeFilter: ['src', 'srcset', 'poster', 'datetime', 'class', 'style']
     });
 }
 
@@ -1921,7 +1921,7 @@ export function triggerDownload(blob, filename, directoryHandle = null, username
             }
         };
         if (directoryHandle) {
-            writeBlobToDirectory(blob, filename, username, directoryHandle)
+            writeBlobToDirectory(blob, filename, username, directoryHandle, USER_SETTING.OVERWRITE_EXISTING_FILES)
                 .then(() => resolve())
                 .catch(err => {
                     console.error('Saving to the selected folder failed; falling back to the browser download location.', err);
