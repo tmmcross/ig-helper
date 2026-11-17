@@ -86,11 +86,13 @@
 
     const DOWNLOAD_OPTIONS = {
         saveLocationDialog: GM_getValue('G_SAVE_LOCATION_DIALOG', 'show'),
+        destinationMode: GM_getValue('G_DOWNLOAD_DESTINATION_MODE', 'browser'),
         collisionMode: GM_getValue('G_DOWNLOAD_COLLISION_MODE', 'skip')
     };
 
     const DOWNLOAD_OPTION_STORAGE_KEYS = {
         saveLocationDialog: 'G_SAVE_LOCATION_DIALOG',
+        destinationMode: 'G_DOWNLOAD_DESTINATION_MODE',
         collisionMode: 'G_DOWNLOAD_COLLISION_MODE'
     };
 
@@ -9472,6 +9474,7 @@
 
         const allowedDownloadOptions = {
             saveLocationDialog: ['show', 'skip'],
+            destinationMode: ['browser', 'folder'],
             collisionMode: ['overwrite', 'suffix', 'skip']
         };
 
@@ -9919,6 +9922,16 @@
             </label>
         `);
         $downloadOptions.append($saveLocationRow);
+
+        const $destinationRow = $('<label class="globalSettings"></label>');
+        $destinationRow.append($('<span>保存先の指定方法</span>'));
+        const $destinationSelect = $('<select class="ih-download-option" data-option="destinationMode" aria-label="保存先の指定方法"></select>');
+        [['browser', 'ブラウザのダウンロード先'], ['folder', 'フォルダを選択（File System Access API）']].forEach(([value, label]) => {
+            $destinationSelect.append($('<option></option>').val(value).text(label));
+        });
+        $destinationSelect.val(DOWNLOAD_OPTIONS.destinationMode);
+        $destinationRow.append($destinationSelect);
+        $downloadOptions.append($destinationRow);
 
         const $collisionRow = $('<label class="globalSettings"></label>');
         $collisionRow.append($('<span>同名ファイルの処理</span>'));
@@ -11387,10 +11400,17 @@
 
         $body.on('change', '.IG_POPUP_DIG select.ih-download-option', function () {
             const $select = $(this);
-            if ($select.attr('data-option') !== 'collisionMode') return;
+            const option = $select.attr('data-option');
             const value = $select.val();
-            if (!['overwrite', 'suffix', 'skip'].includes(value)) return;
 
+            if (option === 'destinationMode') {
+                if (!['browser', 'folder'].includes(value)) return;
+                DOWNLOAD_OPTIONS.destinationMode = value;
+                GM_setValue(DOWNLOAD_OPTION_STORAGE_KEYS.destinationMode, value);
+                return;
+            }
+
+            if (option !== 'collisionMode' || !['overwrite', 'suffix', 'skip'].includes(value)) return;
             DOWNLOAD_OPTIONS.collisionMode = value;
             GM_setValue(DOWNLOAD_OPTION_STORAGE_KEYS.collisionMode, value);
         });
