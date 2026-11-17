@@ -1,4 +1,4 @@
-import { state, USER_SETTING, $body, PARENT_CHILD_MAPPING } from "./settings";
+import { state, USER_SETTING, DOWNLOAD_OPTIONS, DOWNLOAD_OPTION_STORAGE_KEYS, $body, PARENT_CHILD_MAPPING } from "./settings";
 import {
     reloadScript,
     triggerLinkElement, openNewTab, saveFiles, logger, updatePopupSelectionSummary,
@@ -157,6 +157,22 @@ $(function () {
             }
             e.preventDefault();
         }
+    });
+
+    $body.on('change', '.IG_POPUP_DIG select.ih-download-option', function () {
+        const $select = $(this);
+        if ($select.attr('data-option') !== 'collisionMode') return;
+        const value = $select.val();
+        if (!['overwrite', 'suffix', 'skip'].includes(value)) return;
+
+        DOWNLOAD_OPTIONS.collisionMode = value;
+        GM_setValue(DOWNLOAD_OPTION_STORAGE_KEYS.collisionMode, value);
+    });
+
+    $body.on('change', '.IG_POPUP_DIG input#ih-save-location-dialog', function () {
+        const value = $(this).prop('checked') ? 'show' : 'skip';
+        DOWNLOAD_OPTIONS.saveLocationDialog = value;
+        GM_setValue(DOWNLOAD_OPTION_STORAGE_KEYS.saveLocationDialog, value);
     });
 
     $body.on('change', '.IG_POPUP_DIG input', function () {
