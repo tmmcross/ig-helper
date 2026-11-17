@@ -1,21 +1,5 @@
 // ==UserScript==
 // @name               IG Helper+
-// @name:ar            أداة IG
-// @name:de            IG-Helfer
-// @name:es            Ayudante de IG
-// @name:fr            Assistant IG
-// @name:id            Asisten IG
-// @name:it            Assistente IG
-// @name:ja            IG助手
-// @name:ko            IG조수
-// @name:pt-BR         Assistente do IG
-// @name:ro            IG Helper
-// @name:ru            Помощник IG
-// @name:th            ตัวช่วย IG
-// @name:tr            IG Yardımcısı
-// @name:vi            Trợ lý IG
-// @name:zh-CN         IG小助手
-// @name:zh-TW         IG小精靈
 // @namespace          https://github.com/tmmcross/ig-helper/
 // @version            5.4.4.1
 // @description        Download photos and videos from Instagram posts in one click, including Stories, Reels, and profile pictures.
