@@ -4,6 +4,7 @@ import { getUserId } from "./api";
 import { getImageFromCache, mediaIdFromURL } from "./image_cache";
 import { idToShortcode, shortcodeToId, registerPostClickHandlers } from "../functions/post";
 import { cleanupPostObservers, stopAllObservers, scheduleRouteCheck } from "../timer";
+import { writeBlobToDownloadDirectory } from "./download_destination";
 /*! ESLINT IMPORT END !*/
 
 /**
@@ -1373,7 +1374,7 @@ export function saveFiles(downloadLink, metadata) {
                 shortcode &&
                 sourceType === 'photo';
 
-            if (USER_SETTING.USE_EXTERNAL_DOWNLOAD_MODE && !needsExifRewrite) {
+            if (USER_SETTING.USE_EXTERNAL_DOWNLOAD_MODE && DOWNLOAD_OPTIONS.destinationMode !== "folder" && !needsExifRewrite) {
                 GM_download({
                     url: downloadLink,
                     name: downloadName,
@@ -1719,40 +1720,37 @@ export async function tryHandleDashFromMediaItem({
  * @param {Blob} blob
  * @param {string} filename
  */
-export function triggerDownload(blob, filename) {
-    return new Promise(resolve => {
-        const url = URL.createObjectURL(blob);
+export async function triggerDownload(blob, filename) {
+    if (DOWNLOAD_OPTIONS.destinationMode === "folder") {
+        await writeBlobToDownloadDirectory(blob, filename);
+        return;
+    }
 
-        if (USER_SETTING.USE_EXTERNAL_DOWNLOAD_MODE) {
+    const url = URL.createObjectURL(blob);
+    if (USER_SETTING.USE_EXTERNAL_DOWNLOAD_MODE) {
+        await new Promise(resolve => {
             GM_download({
-                url: url,
+                url,
                 name: filename,
-                onload: () => {
-                    URL.revokeObjectURL(url);
-                    resolve();
-                },
-                onerror: () => {
-                    URL.revokeObjectURL(url);
-                    resolve();
-                },
+                onload: resolve,
+                onerror: resolve
             });
-        }
-        else {
-            const link = document.createElement("a");
-            link.href = url;
-            link.download = filename;
-            link.rel = "noopener";
-            link.style.display = "none";
-            document.body.appendChild(link);
-            link.click();
-            setTimeout(() => {
-                // eslint-disable-next-line no-unused-vars
-                try { document.body.removeChild(link); } catch (e) { /* noop */ }
-                URL.revokeObjectURL(url);
-                resolve();
-            }, 250);
-        }
-    });
+        });
+        URL.revokeObjectURL(url);
+    }
+    else {
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = filename;
+        link.rel = "noopener";
+        link.style.display = "none";
+        document.body.appendChild(link);
+        link.click();
+        setTimeout(() => {
+            try { document.body.removeChild(link); } catch (e) { /* noop */ }
+            URL.revokeObjectURL(url);
+        }, 250);
+    }
 }
 
 /**
