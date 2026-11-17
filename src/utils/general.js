@@ -1341,6 +1341,43 @@ export function setDownloadProgress(now, total) {
 }
 
 /**
+ * Update the icon on the download button that initiated the current save operation.
+ * Status feedback is only enabled when the save dialog is disabled.
+ */
+export function beginDownloadButtonStatus(button) {
+    if (DOWNLOAD_OPTIONS.saveLocationDialog === 'show' || !button) return;
+    const $button = $(button);
+    $button.data('ihDownloadPending', 0);
+    $button.data('ihDownloadStarted', false);
+    $button.data('ihDownloadFailed', false);
+    $button.addClass('ih-download-status-active').html(SVG.DOWNLOAD_LOADING);
+}
+
+function trackDownloadButtonStart() {
+    if (DOWNLOAD_OPTIONS.saveLocationDialog === 'show') return;
+    $('.ih-download-status-active').each(function () {
+        const $button = $(this);
+        $button.data('ihDownloadStarted', true);
+        $button.data('ihDownloadPending', ($button.data('ihDownloadPending') || 0) + 1);
+    });
+}
+
+function trackDownloadButtonFinish(success) {
+    if (DOWNLOAD_OPTIONS.saveLocationDialog === 'show') return;
+    $('.ih-download-status-active').each(function () {
+        const $button = $(this);
+        if (!success) $button.data('ihDownloadFailed', true);
+        const pending = Math.max(0, ($button.data('ihDownloadPending') || 1) - 1);
+        $button.data('ihDownloadPending', pending);
+        if (pending === 0 && $button.data('ihDownloadStarted')) {
+            const failed = $button.data('ihDownloadFailed');
+            $button.removeClass('ih-download-status-active')
+                .html(failed ? SVG.DOWNLOAD_ERROR : SVG.DOWNLOAD_SUCCESS);
+        }
+    });
+}
+
+/**
  * saveFiles
  * @description Download the specified media URL to the computer.
  *
@@ -1356,18 +1393,18 @@ export function setDownloadProgress(now, total) {
  * @return {Promise}
  */
 export function saveFiles(downloadLink, metadata) {
+    trackDownloadButtonStart();
     return new Promise(resolve => {
         setTimeout(() => {
             updateLoadingBar(true);
 
-            if (metadata?.shortcode?.match(/^\d+$/) != null) {
+            if (metadata?.shortcode?.match(/^\\d+$/) != null) {
                 metadata.shortcode = idToShortcode(metadata.shortcode);
             }
 
             const downloadName = getSaveFileName(downloadLink, metadata);
             const { filetype, shortcode, sourceType } = metadata;
 
-            // JPEG photos that need their EXIF rewritten must go through fetch()
             const needsExifRewrite =
                 USER_SETTING.MODIFY_RESOURCE_EXIF &&
                 filetype === 'jpg' &&
@@ -1385,26 +1422,38 @@ export function saveFiles(downloadLink, metadata) {
                     ...(DOWNLOAD_OPTIONS.saveLocationDialog === 'show' ? { saveAs: true } : {}),
                     onload: () => {
                         updateLoadingBar(false);
+                        trackDownloadButtonFinish(true);
                         resolve(true);
                     },
-                    // eslint-disable-next-line no-unused-vars
-                    onerror: (err) => {
+                    onerror: () => {
                         updateLoadingBar(false);
-                        resolve(true);
+                        trackDownloadButtonFinish(false);
+                        resolve(false);
                     },
+                    ontimeout: () => {
+                        updateLoadingBar(false);
+                        trackDownloadButtonFinish(false);
+                        resolve(false);
+                    }
                 });
             }
             else {
                 fetch(downloadLink)
-                    .then(res => res.blob())
-                    .then(dwel => {
-                        updateLoadingBar(false);
-                        return createSaveFileElement(downloadLink, dwel, metadata);
+                    .then(res => {
+                        if (!res.ok) throw new Error(`Download request failed: ${res.status}`);
+                        return res.blob();
                     })
-                    .then(() => resolve(true))
+                    .then(dwel => createSaveFileElement(downloadLink, dwel, metadata))
+                    .then(result => {
+                        updateLoadingBar(false);
+                        const success = result !== false;
+                        trackDownloadButtonFinish(success);
+                        resolve(success);
+                    })
                     .catch(err => {
                         updateLoadingBar(false);
                         console.error('saveFiles failed:', err);
+                        trackDownloadButtonFinish(false);
                         resolve(false);
                     });
             }
