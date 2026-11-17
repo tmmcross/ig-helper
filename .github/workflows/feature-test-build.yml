@@ -1,0 +1,38 @@
+name: Feature Branch Test Build
+
+on:
+  push:
+    branches:
+      - feature/ig-helper-plus-foundation
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout feature branch
+        uses: actions/checkout@v4
+        with:
+          ref: feature/ig-helper-plus-foundation
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Build userscript
+        run: npm run build
+
+      - name: Run ESLint
+        run: npx eslint main.js --quiet
+
+      - name: Upload testable userscript
+        uses: actions/upload-artifact@v4
+        with:
+          name: ig-helper-plus-test-build
+          path: main.js
+          if-no-files-found: error
+          retention-days: 14
