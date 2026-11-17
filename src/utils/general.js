@@ -1362,6 +1362,11 @@ function trackDownloadButtonStart() {
     });
 }
 
+// Temporary diagnostics for investigating filename generation and download handoff.
+function logRenameDebug(stage, details) {
+    console.info('[IG Helper Rename Debug]', stage, details);
+}
+
 function trackDownloadButtonFinish(success) {
     if (DOWNLOAD_OPTIONS.saveLocationDialog === 'show') return;
     $('.ih-download-status-active').each(function () {
@@ -1404,6 +1409,16 @@ export function saveFiles(downloadLink, metadata) {
 
             const downloadName = getSaveFileName(downloadLink, metadata);
             const { filetype, shortcode, sourceType } = metadata;
+            logRenameDebug('saveFiles', {
+                autoRename: USER_SETTING.AUTO_RENAME,
+                renameFormat: state.fileRenameFormat,
+                destinationMode: DOWNLOAD_OPTIONS.destinationMode,
+                saveLocationDialog: DOWNLOAD_OPTIONS.saveLocationDialog,
+                username: metadata.username,
+                shortcode,
+                filetype,
+                generatedFilename: downloadName
+            });
 
             const needsExifRewrite =
                 USER_SETTING.MODIFY_RESOURCE_EXIF &&
@@ -1775,6 +1790,17 @@ export async function tryHandleDashFromMediaItem({
  * @param {string} filename
  */
 export async function triggerDownload(blob, filename) {
+    const downloadPath = DOWNLOAD_OPTIONS.destinationMode === "folder"
+        ? 'folder'
+        : (DOWNLOAD_OPTIONS.saveLocationDialog === 'show' || USER_SETTING.USE_EXTERNAL_DOWNLOAD_MODE ? 'GM_download' : 'anchor');
+    logRenameDebug('triggerDownload', {
+        filename,
+        destinationMode: DOWNLOAD_OPTIONS.destinationMode,
+        saveLocationDialog: DOWNLOAD_OPTIONS.saveLocationDialog,
+        externalDownloadMode: USER_SETTING.USE_EXTERNAL_DOWNLOAD_MODE,
+        path: downloadPath
+    });
+
     if (DOWNLOAD_OPTIONS.destinationMode === "folder") {
         const result = await writeBlobToDownloadDirectory(blob, filename, DOWNLOAD_OPTIONS.collisionMode);
         if (result.skipped) {
@@ -1832,6 +1858,18 @@ export async function triggerDownload(blob, filename) {
  */
 export function getSaveFileName(downloadLink, metadata) {
     let { username, sourceType, timestamp, filetype, shortcode, index, uid, thumbnailURL } = metadata;
+    const originalUrlFilename = new URL(downloadLink).pathname.split('/').at(-1);
+
+    logRenameDebug('getSaveFileName input', {
+        autoRename: USER_SETTING.AUTO_RENAME,
+        renameFormat: state.fileRenameFormat,
+        username,
+        sourceType,
+        shortcode,
+        timestamp,
+        filetype,
+        originalUrlFilename
+    });
 
     /*
      * MATCH_VIDEO_FILENAME_TO_THUMBNAIL: for video files (and the .m4a
@@ -1894,6 +1932,13 @@ export function getSaveFileName(downloadLink, metadata) {
     const originally = username + '_' + original_name + '.' + filetype;
     const downloadName = USER_SETTING.AUTO_RENAME ? filename + '.' + filetype : originally;
 
+    logRenameDebug('getSaveFileName result', {
+        autoRename: USER_SETTING.AUTO_RENAME,
+        formattedBaseName: filename,
+        fallbackName: originally,
+        finalFilename: downloadName
+    });
+
     return downloadName;
 }
 
@@ -1933,6 +1978,13 @@ export async function createSaveFileElement(downloadLink, object, metadata) {
     }
 
     const downloadName = getSaveFileName(downloadLink, metadata);
+    logRenameDebug('createSaveFileElement', {
+        username,
+        shortcode,
+        filetype,
+        filename: downloadName,
+        blobType: object?.type
+    });
 
     if (
         USER_SETTING.MODIFY_RESOURCE_EXIF &&
