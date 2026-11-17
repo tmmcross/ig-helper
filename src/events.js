@@ -168,6 +168,18 @@ $(function () {
             GM_setValue(name, isChecked);
             USER_SETTING[name] = isChecked;
 
+            // The overwrite and skip behaviors are mutually exclusive.
+            if (isChecked && name === 'OVERWRITE_EXISTING_FILES') {
+                USER_SETTING.SKIP_EXISTING_FILES = false;
+                GM_setValue('SKIP_EXISTING_FILES', false);
+                $('.IG_POPUP_DIG input#SKIP_EXISTING_FILES').prop('checked', false);
+            }
+            else if (isChecked && name === 'SKIP_EXISTING_FILES') {
+                USER_SETTING.OVERWRITE_EXISTING_FILES = false;
+                GM_setValue('OVERWRITE_EXISTING_FILES', false);
+                $('.IG_POPUP_DIG input#OVERWRITE_EXISTING_FILES').prop('checked', false);
+            }
+
             if (isChecked) {
                 for (const [parent, children] of Object.entries(PARENT_CHILD_MAPPING)) {
                     if (children.includes(name) && USER_SETTING[parent] !== true) {
