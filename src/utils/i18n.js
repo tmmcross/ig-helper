@@ -63,6 +63,8 @@ export function translateText() {
             "DIRECT_DOWNLOAD_STORY": "Directly Download All Resources in the Story/Highlight",
             "MODIFY_VIDEO_VOLUME": "Modify Video Volume (Right-Click to Set)",
             "MODIFY_RESOURCE_EXIF": "Modify Resource EXIF Properties",
+            "OVERWRITE_EXISTING_FILES": "Overwrite Existing Files",
+            "OVERWRITE_EXISTING_FILES_INTRO": "When enabled, a file with the same name in the selected download folder will be replaced. When disabled, a numbered suffix is added instead.",
             "SCROLL_BUTTON": "Enable Scroll Buttons for Reels Page",
             "PREFER_DASH_MANIFEST_FOR_STORIES_AND_HIGHLIGHTS": "Prefer DASH Manifest for Higher-Quality Story/Highlight Video",
             "NEW_TAB_OPEN_HIGHEST_VIDEO_VIA_GRAPHQL": "Open the Highest-Quality Story/Highlight Video in New Tab (Without Audio)",
