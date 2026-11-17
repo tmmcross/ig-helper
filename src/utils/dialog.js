@@ -297,8 +297,6 @@ export function showSetting() {
         $downloadOptions.append($row);
     });
 
-    $downloadOptions.append('<p class="ih-settings-note">保存先を指定していない場合は、ダウンロード時に保存場所を選択します。</p>');
-    $downloadOptions.append('<p class="ih-settings-note">「Fork元のファイル名」を選ぶと、従来の自動リネーム設定が適用されます。</p>');
 
     const settingGroups = [
         { title: 'ダウンロード動作', names: ['DIRECT_DOWNLOAD_ALL', 'DIRECT_DOWNLOAD_STORY', 'DIRECT_DOWNLOAD_VISIBLE_RESOURCE', 'FORCE_FETCH_ALL_RESOURCES', 'USE_EXTERNAL_DOWNLOAD_MODE'] },
