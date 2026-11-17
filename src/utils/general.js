@@ -1943,15 +1943,14 @@ export async function createSaveFileElement(downloadLink, object, metadata) {
     ) {
         try {
             const newBlob = await changeExifData(object, metadata);
-            await triggerDownload(newBlob, downloadName);
+            return await triggerDownload(newBlob, downloadName);
         } catch (err) {
             console.error('Failed to strip EXIF and/or attach post URL to EXIF.', err);
-            await triggerDownload(object, downloadName);
+            return await triggerDownload(object, downloadName);
         }
-        return;
     }
     else {
-        await triggerDownload(object, downloadName);
+        return await triggerDownload(object, downloadName);
     }
 }
 
