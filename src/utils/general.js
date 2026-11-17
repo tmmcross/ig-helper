@@ -1374,10 +1374,15 @@ export function saveFiles(downloadLink, metadata) {
                 shortcode &&
                 sourceType === 'photo';
 
-            if (USER_SETTING.USE_EXTERNAL_DOWNLOAD_MODE && DOWNLOAD_OPTIONS.destinationMode !== "folder" && !needsExifRewrite) {
+            if (
+                (DOWNLOAD_OPTIONS.saveLocationDialog === 'show' ||
+                    (USER_SETTING.USE_EXTERNAL_DOWNLOAD_MODE && DOWNLOAD_OPTIONS.destinationMode !== "folder")) &&
+                !needsExifRewrite
+            ) {
                 GM_download({
                     url: downloadLink,
                     name: downloadName,
+                    ...(DOWNLOAD_OPTIONS.saveLocationDialog === 'show' ? { saveAs: true } : {}),
                     onload: () => {
                         updateLoadingBar(false);
                         resolve(true);
@@ -1730,16 +1735,20 @@ export async function triggerDownload(blob, filename) {
     }
 
     const url = URL.createObjectURL(blob);
-    if (USER_SETTING.USE_EXTERNAL_DOWNLOAD_MODE) {
-        await new Promise(resolve => {
-            GM_download({
-                url,
-                name: filename,
-                onload: resolve,
-                onerror: resolve
+    if (DOWNLOAD_OPTIONS.saveLocationDialog === 'show' || USER_SETTING.USE_EXTERNAL_DOWNLOAD_MODE) {
+        try {
+            await new Promise(resolve => {
+                GM_download({
+                    url,
+                    name: filename,
+                    ...(DOWNLOAD_OPTIONS.saveLocationDialog === 'show' ? { saveAs: true } : {}),
+                    onload: resolve,
+                    onerror: resolve
+                });
             });
-        });
-        URL.revokeObjectURL(url);
+        } finally {
+            URL.revokeObjectURL(url);
+        }
     }
     else {
         const link = document.createElement("a");
