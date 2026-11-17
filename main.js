@@ -85,16 +85,12 @@
     };
 
     const DOWNLOAD_OPTIONS = {
-        saveLocationDialog: 'show',     // 'show' | 'skip' (UI preference; behavior added later)
-        filenameMode: 'media_id',       // 'media_id' | 'fork'
-        usernamePlacement: 'subfolder', // 'subfolder' | 'filename'
-        collisionMode: 'skip'           // 'overwrite' | 'suffix' | 'skip'
+        saveLocationDialog: GM_getValue('G_SAVE_LOCATION_DIALOG', 'show'),
+        collisionMode: GM_getValue('G_DOWNLOAD_COLLISION_MODE', 'skip')
     };
 
     const DOWNLOAD_OPTION_STORAGE_KEYS = {
         saveLocationDialog: 'G_SAVE_LOCATION_DIALOG',
-        filenameMode: 'G_DOWNLOAD_FILENAME_MODE',
-        usernamePlacement: 'G_DOWNLOAD_USERNAME_PLACEMENT',
         collisionMode: 'G_DOWNLOAD_COLLISION_MODE'
     };
 
@@ -9912,68 +9908,29 @@
 
         const $popupBody = $('.IG_POPUP_DIG .IG_POPUP_DIG_BODY');
 
-        // Download and filename-related options share one section with filename metadata settings.
-        $popupBody.append('<section class="ih-settings-section"><h3>保存・ファイル名・メタデータ</h3><div class="ih-download-options"></div></section>');
-        const $filenameSection = $popupBody.find('.ih-settings-section').last();
+        // Filename format details are configured from AUTO_RENAME's context menu.
+        const $filenameSection = $('<section class="ih-settings-section"><h3>ファイル名・メタデータ</h3><div class="ih-download-options"></div></section>');
+        $popupBody.append($filenameSection);
         const $downloadOptions = $filenameSection.find('.ih-download-options');
 
-        // UI only: folder selection and save-location dialog behavior will be wired up later.
-        const $folderRow = $('<label class="globalSettings"></label>');
-        $folderRow.append('<span>保存フォルダ</span>');
-        $folderRow.append('<span>未指定（ダウンロード時に選択）</span>');
-        $folderRow.append('<button type="button" disabled>フォルダを選択</button>');
-        $downloadOptions.append($folderRow);
+        const $saveLocationRow = $(`
+            <label class="globalSettings">
+                <span>保存場所確認ウインドウ</span>
+                <input id="ih-save-location-dialog" type="checkbox" ${DOWNLOAD_OPTIONS.saveLocationDialog === 'show' ? 'checked' : ''}>
+                <div class="chbtn"><div class="rounds"></div></div>
+            </label>
+        `);
+        $downloadOptions.append($saveLocationRow);
 
-        const optionRows = [
-            {
-                key: 'saveLocationDialog',
-                label: '保存場所確認ウインドウ',
-                options: [
-                    ['show', '表示する'],
-                    ['skip', '省略する']
-                ]
-            },
-            {
-                key: 'filenameMode',
-                label: 'ファイル名',
-                options: [
-                    ['media_id', 'メディアIDのみ'],
-                    ['fork', 'Fork元のファイル名']
-                ]
-            },
-            {
-                key: 'usernamePlacement',
-                label: 'ユーザー名の扱い',
-                options: [
-                    ['subfolder', 'サブフォルダ'],
-                    ['filename', 'ファイル名に付加']
-                ]
-            },
-            {
-                key: 'collisionMode',
-                label: '同名ファイルの処理',
-                options: [
-                    ['overwrite', '上書き'],
-                    ['suffix', '連番を付ける'],
-                    ['skip', 'スキップ']
-                ]
-            }
-        ];
-
-        optionRows.forEach(({ key, label, options }) => {
-            const $row = $('<label class="globalSettings"></label>');
-            $row.append($('<span></span>').text(label));
-            const $select = $('<select class="ih-download-option"></select>')
-                .attr('data-option', key)
-                .attr('aria-label', label);
-            options.forEach(([value, text]) => {
-                $select.append($('<option></option>').val(value).text(text));
-            });
-            $select.val(DOWNLOAD_OPTIONS[key] || options[0][0]);
-            $row.append($select);
-            $downloadOptions.append($row);
+        const $collisionRow = $('<label class="globalSettings"></label>');
+        $collisionRow.append($('<span>同名ファイルの処理</span>'));
+        const $collisionSelect = $('<select class="ih-download-option" data-option="collisionMode" aria-label="同名ファイルの処理"></select>');
+        [['overwrite', '上書き'], ['suffix', '連番を付ける'], ['skip', 'スキップ']].forEach(([value, label]) => {
+            $collisionSelect.append($('<option></option>').val(value).text(label));
         });
-
+        $collisionSelect.val(DOWNLOAD_OPTIONS.collisionMode);
+        $collisionRow.append($collisionSelect);
+        $downloadOptions.append($collisionRow);
 
         const settingGroups = [
             { title: 'ダウンロード動作', names: ['DIRECT_DOWNLOAD_ALL', 'DIRECT_DOWNLOAD_STORY', 'DIRECT_DOWNLOAD_VISIBLE_RESOURCE', 'FORCE_FETCH_ALL_RESOURCES', 'USE_EXTERNAL_DOWNLOAD_MODE'] },
@@ -10048,15 +10005,6 @@
             $section.append($items);
             $popupBody.append($section);
         }
-
-        const updateFilenameModeControls = () => {
-            const isForkFilename = DOWNLOAD_OPTIONS.filenameMode === 'fork';
-            $popupBody.find('input#AUTO_RENAME, input#RENAME_PUBLISH_DATE')
-                .prop('disabled', !isForkFilename)
-                .closest('label')
-                .toggleClass('is-disabled', !isForkFilename);
-        };
-        updateFilenameModeControls();
 
         arrangeSettingHierarchy();
     }
@@ -10149,7 +10097,7 @@
      * RENAME_FORMAT_SEPARATORS
      * @description Literal text chips offered in the rename format editor.
      */
-    const RENAME_FORMAT_SEPARATORS = ['-', '_', '.', ' ', '(', ')', '[', ']'];
+    const RENAME_FORMAT_SEPARATORS = ['/', '-', '_', '.', ' ', '(', ')', '[', ']'];
 
     /**
      * parseRenameFormat
@@ -10269,7 +10217,7 @@
 
         const descriptions = getRenameFormatDescriptions();
         const samples = getRenameFormatSamples();
-        const invalidChars = /[\\/:*?"<>|]/g;
+        const invalidChars = /[\\:*?"<>|]/g;
 
         let tokens = parseRenameFormat(state.fileRenameFormat);
         let dragPayload = null;
@@ -11441,29 +11389,18 @@
 
         $body.on('change', '.IG_POPUP_DIG select.ih-download-option', function () {
             const $select = $(this);
-            const optionName = $select.attr('data-option');
+            if ($select.attr('data-option') !== 'collisionMode') return;
             const value = $select.val();
-            const allowedOptions = {
-                saveLocationDialog: ['show', 'skip'],
-                filenameMode: ['media_id', 'fork'],
-                usernamePlacement: ['subfolder', 'filename'],
-                collisionMode: ['overwrite', 'suffix', 'skip']
-            };
+            if (!['overwrite', 'suffix', 'skip'].includes(value)) return;
 
-            if (!allowedOptions[optionName]?.includes(value)) return;
+            DOWNLOAD_OPTIONS.collisionMode = value;
+            GM_setValue(DOWNLOAD_OPTION_STORAGE_KEYS.collisionMode, value);
+        });
 
-            DOWNLOAD_OPTIONS[optionName] = value;
-            GM_setValue(DOWNLOAD_OPTION_STORAGE_KEYS[optionName], value);
-
-            if (optionName === 'filenameMode') {
-                const isForkFilename = value === 'fork';
-                $('.IG_POPUP_DIG input#AUTO_RENAME, .IG_POPUP_DIG input#RENAME_PUBLISH_DATE')
-                    .prop('disabled', !isForkFilename)
-                    .closest('label')
-                    .toggleClass('is-disabled', !isForkFilename);
-            }
-
-            console.log('download option', optionName, value);
+        $body.on('change', '.IG_POPUP_DIG input#ih-save-location-dialog', function () {
+            const value = $(this).prop('checked') ? 'show' : 'skip';
+            DOWNLOAD_OPTIONS.saveLocationDialog = value;
+            GM_setValue(DOWNLOAD_OPTION_STORAGE_KEYS.saveLocationDialog, value);
         });
 
         $body.on('change', '.IG_POPUP_DIG input', function () {
