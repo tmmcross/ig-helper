@@ -9022,32 +9022,33 @@
         const url = URL.createObjectURL(blob);
         if (DOWNLOAD_OPTIONS.saveLocationDialog === 'show' || USER_SETTING.USE_EXTERNAL_DOWNLOAD_MODE) {
             try {
-                await new Promise(resolve => {
+                return await new Promise(resolve => {
                     GM_download({
                         url,
                         name: filename,
                         ...(DOWNLOAD_OPTIONS.saveLocationDialog === 'show' ? { saveAs: true } : {}),
-                        onload: resolve,
-                        onerror: resolve
+                        onload: () => resolve(true),
+                        onerror: () => resolve(false),
+                        ontimeout: () => resolve(false)
                     });
                 });
             } finally {
                 URL.revokeObjectURL(url);
             }
         }
-        else {
-            const link = document.createElement("a");
-            link.href = url;
-            link.download = filename;
-            link.rel = "noopener";
-            link.style.display = "none";
-            document.body.appendChild(link);
-            link.click();
-            setTimeout(() => {
-                try { document.body.removeChild(link); } catch { /* noop */ }
-                URL.revokeObjectURL(url);
-            }, 250);
-        }
+
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = filename;
+        link.rel = "noopener";
+        link.style.display = "none";
+        document.body.appendChild(link);
+        link.click();
+        setTimeout(() => {
+            try { document.body.removeChild(link); } catch { /* noop */ }
+            URL.revokeObjectURL(url);
+        }, 250);
+        return true;
     }
 
     /**
@@ -9178,15 +9179,14 @@
         ) {
             try {
                 const newBlob = await changeExifData(object, metadata);
-                await triggerDownload(newBlob, downloadName);
+                return await triggerDownload(newBlob, downloadName);
             } catch (err) {
                 console.error('Failed to strip EXIF and/or attach post URL to EXIF.', err);
-                await triggerDownload(object, downloadName);
+                return await triggerDownload(object, downloadName);
             }
-            return;
         }
         else {
-            await triggerDownload(object, downloadName);
+            return await triggerDownload(object, downloadName);
         }
     }
 
@@ -11817,7 +11817,7 @@
         });
 
         // Show per-button progress/result feedback when downloads run without a save dialog.
-        $body.on('click', '.IG_DW_MAIN, .IG_DWSTORY, .IG_DWHISTORY, .IG_REELS, .IG_DWPROFILE', function () {
+        $body.on('click', '.IG_DW_MAIN, .IG_DW_ALL_MAIN, .IG_DWSTORY, .IG_DWSTORY_ALL, .IG_DWHISTORY, .IG_DWHISTORY_ALL, .IG_REELS, .IG_DWPROFILE', function () {
             beginDownloadButtonStatus(this);
         });
 
