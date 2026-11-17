@@ -1345,7 +1345,7 @@ export function saveFiles(downloadLink, metadata) {
                 const destination = await directoryPromise;
                 if (destination?.cancelled) {
                     updateLoadingBar(false);
-                    resolve(true);
+                    finish(null);
                     return;
                 }
                 const directoryHandle = destination?.handle ?? null;
@@ -1363,9 +1363,9 @@ export function saveFiles(downloadLink, metadata) {
                     GM_download({
                         url: downloadLink,
                         name: downloadName,
-                        onload: () => { updateLoadingBar(false); resolve(true); },
+                        onload: () => { updateLoadingBar(false); finish(true); },
                         // eslint-disable-next-line no-unused-vars
-                        onerror: (err) => { updateLoadingBar(false); resolve(true); },
+                        onerror: (err) => { updateLoadingBar(false); finish(false); },
                     });
                 }
                 else {
@@ -1423,8 +1423,8 @@ function showDownloadNotice(message, isError = false) {
 }
 
 function beginDownloadNotice() {
+    if (activeDownloadNotices === 0) failedDownloadNotices = 0;
     activeDownloadNotices++;
-    failedDownloadNotices = 0;
     clearTimeout(downloadNoticeTimer);
     showDownloadNotice('保存中…');
 }
@@ -1434,6 +1434,16 @@ function finishDownloadNotice(success) {
     if (success === false) failedDownloadNotices++;
     if (activeDownloadNotices > 0) {
         showDownloadNotice('保存中…');
+        return;
+    }
+    if (success === null) {
+        if (downloadNoticeElement) {
+            downloadNoticeElement.style.opacity = '0';
+            downloadNoticeTimer = setTimeout(() => {
+                downloadNoticeElement?.remove();
+                downloadNoticeElement = null;
+            }, 180);
+        }
         return;
     }
 
@@ -1905,7 +1915,10 @@ export function getSaveFileName(downloadLink, metadata) {
  * @return {void}
  */
 export async function createSaveFileElement(downloadLink, object, metadata, directoryHandle = null) {
-    let { username, sourceType, filetype, shortcode } = metadata;
+    beginDownloadNotice();
+    let noticeSuccess = false;
+    try {
+        let { username, sourceType, filetype, shortcode } = metadata;
 
     if (metadata.uid == null) {
         username = metadata.username;
@@ -1942,6 +1955,11 @@ export async function createSaveFileElement(downloadLink, object, metadata, dire
     }
     else {
         await triggerDownload(object, downloadName, directoryHandle, username);
+    }
+        noticeSuccess = true;
+    }
+    finally {
+        finishDownloadNotice(noticeSuccess);
     }
 }
 
@@ -2416,6 +2434,12 @@ export function logger(...messages) {
  * @return {void}
  */
 export function initSettings() {
+    const legacyRenameFormat = '%USERNAME%-%SOURCE_TYPE%-%SHORTCODE%-%YEAR%%MONTH%%DAY%_%HOUR%%MINUTE%%SECOND%_%ORIGINAL_NAME_FIRST%';
+    if (state.fileRenameFormat === legacyRenameFormat) {
+        state.fileRenameFormat = DEFAULT_RENAME_FORMAT;
+        GM_setValue('G_RENAME_FORMAT', DEFAULT_RENAME_FORMAT);
+    }
+
     for (const [legacyName, currentName] of Object.entries(LEGACY_SETTING_MIGRATIONS)) {
         const legacyValue = GM_getValue(legacyName);
         if (GM_getValue(currentName) == null && typeof legacyValue === 'boolean') {
