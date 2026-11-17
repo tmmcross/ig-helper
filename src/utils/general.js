@@ -1,4 +1,4 @@
-import { USER_SETTING, state, userIdCache, $body, SVG, LEGACY_SETTING_MIGRATIONS } from "../settings";
+import { USER_SETTING, DOWNLOAD_OPTIONS, DOWNLOAD_OPTION_STORAGE_KEYS, state, userIdCache, $body, SVG, LEGACY_SETTING_MIGRATIONS } from "../settings";
 import { _i18n } from "./i18n";
 import { getUserId } from "./api";
 import { getImageFromCache, mediaIdFromURL } from "./image_cache";
@@ -2379,6 +2379,19 @@ export function initSettings() {
             if (name === "MODIFY_VIDEO_VOLUME" && GM_getValue(name) !== true) {
                 state.videoVolume = 1;
             }
+        }
+    }
+
+    const allowedDownloadOptions = {
+        filenameMode: ['media_id', 'fork'],
+        usernamePlacement: ['subfolder', 'filename'],
+        collisionMode: ['overwrite', 'suffix', 'skip']
+    };
+
+    for (const [name, allowedValues] of Object.entries(allowedDownloadOptions)) {
+        const storedValue = GM_getValue(DOWNLOAD_OPTION_STORAGE_KEYS[name]);
+        if (allowedValues.includes(storedValue)) {
+            DOWNLOAD_OPTIONS[name] = storedValue;
         }
     }
 }
