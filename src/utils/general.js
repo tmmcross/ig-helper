@@ -2,7 +2,7 @@ import { USER_SETTING, DOWNLOAD_OPTIONS, DOWNLOAD_OPTION_STORAGE_KEYS, state, us
 import { _i18n } from "./i18n";
 import { getUserId } from "./api";
 import { getImageFromCache, mediaIdFromURL } from "./image_cache";
-import { idToShortcode, registerPostClickHandlers } from "../functions/post";
+import { idToShortcode, shortcodeToId, registerPostClickHandlers } from "../functions/post";
 import { cleanupPostObservers, stopAllObservers, scheduleRouteCheck } from "../timer";
 /*! ESLINT IMPORT END !*/
 
@@ -1808,6 +1808,7 @@ export function getSaveFileName(downloadLink, metadata) {
         '%USERNAME%': username,
         '%SOURCE_TYPE%': sourceType,
         '%SHORTCODE%': shortcode || '',
+        '%MEDIA_ID%': /^\\d+$/.test(String(shortcode || '')) ? String(shortcode) : (shortcodeToId(String(shortcode || '')) || ''),
         '%YEAR%': year,
         '%2-YEAR%': year.substr(-2),
         '%MONTH%': month,
