@@ -1435,6 +1435,7 @@ function finishActiveDownloadButton() {
     }
     else if (activeDownloadFailed) {
         renderDownloadButtonIcon(button, 'error');
+        button.style.opacity = '1';
         enableOtherDownloadButtons(button);
         setTimeout(() => {
             if (button.dataset.ihDownloadState !== 'error') return;
@@ -1447,6 +1448,7 @@ function finishActiveDownloadButton() {
     }
     else {
         renderDownloadButtonIcon(button, 'success');
+        button.style.opacity = '1';
         enableOtherDownloadButtons(button);
         // Keep the completed button disabled and checked until the page is reloaded.
     }
