@@ -26,6 +26,16 @@ export const USER_SETTING = {
     'USE_EXTERNAL_DOWNLOAD_MODE': false
 };
 
+export const DOWNLOAD_OPTIONS = {
+    saveLocationDialog: GM_getValue('G_SAVE_LOCATION_DIALOG', 'show'),
+    collisionMode: GM_getValue('G_DOWNLOAD_COLLISION_MODE', 'skip')
+};
+
+export const DOWNLOAD_OPTION_STORAGE_KEYS = {
+    saveLocationDialog: 'G_SAVE_LOCATION_DIALOG',
+    collisionMode: 'G_DOWNLOAD_COLLISION_MODE'
+};
+
 export const PARENT_CHILD_MAPPING = {
     'AUTO_RENAME': [
         'RENAME_PUBLISH_DATE'
