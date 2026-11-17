@@ -241,7 +241,7 @@ export function showSetting() {
 
     const $saveLocationRow = $(`
         <label class="globalSettings">
-            <span>保存場所確認ウインドウ</span>
+            <span>保存時にダイアログを表示</span>
             <input id="ih-save-location-dialog" type="checkbox" ${DOWNLOAD_OPTIONS.saveLocationDialog === 'show' ? 'checked' : ''}>
             <div class="chbtn"><div class="rounds"></div></div>
         </label>
