@@ -181,7 +181,9 @@ export async function writeBlobToDirectory(blob, filename, username, rootHandle,
 
     if (skipExisting) {
         reservation = userFolderName + '/' + candidate;
-        if (reservedDownloadPaths.has(reservation) || await fileExists(userDirectory, candidate)) return null;
+        if (reservedDownloadPaths.has(reservation)) return null;
+        if (await fileExists(userDirectory, candidate)) return null;
+        if (reservedDownloadPaths.has(reservation)) return null;
     }
     else if (overwriteExisting) {
         reservation = userFolderName + '/' + candidate;
