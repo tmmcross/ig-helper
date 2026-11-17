@@ -1401,7 +1401,7 @@ let activeDownloadOriginalHTML = null;
 
 function renderDownloadButtonIcon(button, type) {
     const icons = {
-        loading: '<svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M21 12a9 9 0 1 1-6.2-8.56"/></svg>',
+        loading: '<svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" style="animation: igHelperDownloadSpin 1s linear infinite"><path d="M21 12a9 9 0 1 1-6.2-8.56"/></svg>',
         success: '<svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 4 4L19 6"/></svg>',
         error: '<svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 8v5m0 3h.01"/></svg>'
     };
@@ -1467,6 +1467,13 @@ export function setActiveDownloadButton(button) {
     activeDownloadFailed = false;
     activeDownloadCancelled = false;
 
+    if (!document.getElementById('IG_HELPER_DOWNLOAD_BUTTON_STYLE')) {
+        const style = document.createElement('style');
+        style.id = 'IG_HELPER_DOWNLOAD_BUTTON_STYLE';
+        style.textContent = '@keyframes igHelperDownloadSpin { to { transform: rotate(360deg); } }';
+        document.head.appendChild(style);
+    }
+
     document.querySelectorAll(DOWNLOAD_BUTTON_SELECTOR).forEach((item) => {
         item.setAttribute('aria-disabled', 'true');
         item.style.pointerEvents = 'none';
@@ -1478,7 +1485,7 @@ export function setActiveDownloadButton(button) {
     downloadButtonTimeout = setTimeout(() => {
         activeDownloadFailed = true;
         finishActiveDownloadButton();
-    }, 90000);
+    }, 600000);
     return true;
 }
 
@@ -1952,8 +1959,7 @@ export function getSaveFileName(downloadLink, metadata) {
  * @return {void}
  */
 export async function createSaveFileElement(downloadLink, object, metadata, directoryHandle = null) {
-    try {
-        let { username, sourceType, filetype, shortcode } = metadata;
+    let { username, sourceType, filetype, shortcode } = metadata;
 
     if (metadata.uid == null) {
         username = metadata.username;
@@ -1989,9 +1995,6 @@ export async function createSaveFileElement(downloadLink, object, metadata, dire
     }
     else {
         await triggerDownload(object, downloadName, directoryHandle, username);
-    }
-    }
-    finally {
     }
 }
 
