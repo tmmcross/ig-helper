@@ -1,4 +1,4 @@
-import { USER_SETTING, state, userIdCache, $body, SVG, LEGACY_SETTING_MIGRATIONS } from "../settings";
+import { USER_SETTING, state, userIdCache, $body, SVG, LEGACY_SETTING_MIGRATIONS, DEFAULT_RENAME_FORMAT } from "../settings";
 import { getDirectoryHandleForSave, writeBlobToDirectory } from "./download_storage";
 import { _i18n } from "./i18n";
 import { getUserId } from "./api";
@@ -1891,7 +1891,7 @@ export function getSaveFileName(downloadLink, metadata) {
         return replacements[str];
     }).replace(/^-+/, '').replace(/-+$/, '');
 
-    const originally = original_name + '.' + filetype;
+    const originally = (shortcode ? shortcode + '-' : '') + original_name + '.' + filetype;
     const downloadName = USER_SETTING.AUTO_RENAME ? filename + '.' + filetype : originally;
 
     return downloadName;
@@ -1951,7 +1951,6 @@ export async function createSaveFileElement(downloadLink, object, metadata, dire
             console.error('Failed to strip EXIF and/or attach post URL to EXIF.', err);
             await triggerDownload(object, downloadName, directoryHandle, username);
         }
-        return;
     }
     else {
         await triggerDownload(object, downloadName, directoryHandle, username);
