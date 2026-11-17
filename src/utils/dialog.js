@@ -237,7 +237,25 @@ export function showSetting() {
     $popupBody.append('<section class="ih-settings-section"><h3>保存・ファイル名・メタデータ</h3><div class="ih-download-options"></div></section>');
     const $filenameSection = $popupBody.find('.ih-settings-section').last();
     const $downloadOptions = $filenameSection.find('.ih-download-options');
+
+    // UI only: folder selection and save-location dialog behavior will be wired up later.
+    const $folderRow = $('<div class="ih-download-folder-row"></div>');
+    $folderRow.append('<span class="ih-download-folder-label">保存フォルダ</span>');
+    const $folderControl = $('<div class="ih-download-folder-control"></div>');
+    $folderControl.append('<span class="ih-download-folder-path">未指定（ダウンロード時に選択）</span>');
+    $folderControl.append('<button type="button" class="ih-download-folder-button" disabled>フォルダを選択</button>');
+    $folderRow.append($folderControl);
+    $downloadOptions.append($folderRow);
+
     const optionRows = [
+        {
+            key: 'saveLocationDialog',
+            label: '保存場所確認ウインドウ',
+            options: [
+                ['show', '表示する'],
+                ['skip', '省略する']
+            ]
+        },
         {
             key: 'filenameMode',
             label: 'ファイル名',
@@ -279,7 +297,7 @@ export function showSetting() {
         $downloadOptions.append($row);
     });
 
-    $downloadOptions.append('<p class="ih-settings-note">保存先は現在、ブラウザ標準のダウンロード先です。</p>');
+    $downloadOptions.append('<p class="ih-settings-note">保存先を指定していない場合は、ダウンロード時に保存場所を選択します。</p>');
     $downloadOptions.append('<p class="ih-settings-note">「Fork元のファイル名」を選ぶと、従来の自動リネーム設定が適用されます。</p>');
 
     const settingGroups = [
