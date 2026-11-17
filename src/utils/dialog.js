@@ -287,6 +287,7 @@ export function showSetting() {
     $collisionSelect.val(DOWNLOAD_OPTIONS.collisionMode);
     $collisionRow.append($collisionSelect);
     $downloadOptions.append($collisionRow);
+    $downloadOptions.append($('<p class="ih-download-option-note">同名ファイルの処理は、選択したフォルダへの保存時に適用されます。ブラウザのダウンロード先ではブラウザ側の動作に従います。</p>'));
 
     const settingGroups = [
         { title: 'ダウンロード動作', names: ['DIRECT_DOWNLOAD_ALL', 'DIRECT_DOWNLOAD_STORY', 'DIRECT_DOWNLOAD_VISIBLE_RESOURCE', 'FORCE_FETCH_ALL_RESOURCES', 'USE_EXTERNAL_DOWNLOAD_MODE'] },
