@@ -239,12 +239,10 @@ export function showSetting() {
     const $downloadOptions = $filenameSection.find('.ih-download-options');
 
     // UI only: folder selection and save-location dialog behavior will be wired up later.
-    const $folderRow = $('<div class="ih-download-folder-row"></div>');
-    $folderRow.append('<span class="ih-download-folder-label">保存フォルダ</span>');
-    const $folderControl = $('<div class="ih-download-folder-control"></div>');
-    $folderControl.append('<span class="ih-download-folder-path">未指定（ダウンロード時に選択）</span>');
-    $folderControl.append('<button type="button" class="ih-download-folder-button" disabled>フォルダを選択</button>');
-    $folderRow.append($folderControl);
+    const $folderRow = $('<label class="globalSettings"></label>');
+    $folderRow.append('<span>保存フォルダ</span>');
+    $folderRow.append('<span>未指定（ダウンロード時に選択）</span>');
+    $folderRow.append('<button type="button" disabled>フォルダを選択</button>');
     $downloadOptions.append($folderRow);
 
     const optionRows = [
@@ -284,7 +282,7 @@ export function showSetting() {
     ];
 
     optionRows.forEach(({ key, label, options }) => {
-        const $row = $('<label class="ih-download-setting-row"></label>');
+        const $row = $('<label class="globalSettings"></label>');
         $row.append($('<span></span>').text(label));
         const $select = $('<select class="ih-download-option"></select>')
             .attr('data-option', key)
