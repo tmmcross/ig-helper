@@ -29,7 +29,7 @@ export const RENAME_FORMAT_KEYS = [
  * RENAME_FORMAT_SEPARATORS
  * @description Literal text chips offered in the rename format editor.
  */
-export const RENAME_FORMAT_SEPARATORS = ['-', '_', '.', ' ', '(', ')', '[', ']'];
+export const RENAME_FORMAT_SEPARATORS = ['/', '-', '_', '.', ' ', '(', ')', '[', ']'];
 
 /**
  * parseRenameFormat
@@ -149,7 +149,7 @@ export function showRenameFormatEditor() {
 
     const descriptions = getRenameFormatDescriptions();
     const samples = getRenameFormatSamples();
-    const invalidChars = /[\\/:*?"<>|]/g;
+    const invalidChars = /[\\:*?"<>|]/g;
 
     let tokens = parseRenameFormat(state.fileRenameFormat);
     let dragPayload = null;
