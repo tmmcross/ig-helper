@@ -2384,6 +2384,7 @@ export function initSettings() {
 
     const allowedDownloadOptions = {
         saveLocationDialog: ['show', 'skip'],
+        destinationMode: ['browser', 'folder'],
         collisionMode: ['overwrite', 'suffix', 'skip']
     };
 
