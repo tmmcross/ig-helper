@@ -28,11 +28,13 @@ export const USER_SETTING = {
 
 export const DOWNLOAD_OPTIONS = {
     saveLocationDialog: GM_getValue('G_SAVE_LOCATION_DIALOG', 'show'),
+    destinationMode: GM_getValue('G_DOWNLOAD_DESTINATION_MODE', 'browser'),
     collisionMode: GM_getValue('G_DOWNLOAD_COLLISION_MODE', 'skip')
 };
 
 export const DOWNLOAD_OPTION_STORAGE_KEYS = {
     saveLocationDialog: 'G_SAVE_LOCATION_DIALOG',
+    destinationMode: 'G_DOWNLOAD_DESTINATION_MODE',
     collisionMode: 'G_DOWNLOAD_COLLISION_MODE'
 };
 
