@@ -1398,6 +1398,75 @@ let activeDownloadCancelled = false;
 let downloadButtonFinishTimer = null;
 let downloadButtonTimeout = null;
 let activeDownloadOriginalHTML = null;
+let completedDownloadButton = null;
+let completedDownloadOriginalHTML = null;
+let completedDownloadMediaKey = null;
+let completedDownloadObserver = null;
+let completedDownloadCheckTimer = null;
+
+function getDownloadButtonMediaKey(button) {
+    if (button.matches('.IG_DWPROFILE')) return location.pathname;
+    const isStoryButton = button.matches('.IG_DWSTORY, .IG_DWSTORY_THUMBNAIL, .IG_DWHISTORY, .IG_DWHISTORY_THUMBNAIL');
+    const isReelButton = button.matches('.IG_REELS, .IG_REELS_THUMBNAIL');
+    if (!isStoryButton && !isReelButton) return location.pathname;
+
+    const sections = Array.from(document.querySelectorAll('body > div section'))
+        .filter(section => section.getClientRects().length > 0);
+    const section = sections.find(item => item.querySelector('video, img'));
+    if (!section) return null;
+
+    const video = section.querySelector('video');
+    const image = section.querySelector('img');
+    const mediaURL = video?.currentSrc || video?.getAttribute('src') || video?.poster ||
+        image?.currentSrc || image?.getAttribute('src') || '';
+    const timestamp = section.querySelector('time[datetime]')?.getAttribute('datetime') || '';
+    if (!mediaURL && !timestamp) return null;
+    return [location.pathname, timestamp, mediaURL].join('|');
+}
+
+function resetCompletedDownloadButton() {
+    if (!completedDownloadButton) return;
+    const button = completedDownloadButton;
+    if (button.isConnected) {
+        button.innerHTML = completedDownloadOriginalHTML;
+        delete button.dataset.ihDownloadState;
+        button.removeAttribute('aria-disabled');
+        button.style.pointerEvents = '';
+        button.style.opacity = '';
+    }
+    completedDownloadButton = null;
+    completedDownloadOriginalHTML = null;
+    completedDownloadMediaKey = null;
+    completedDownloadObserver?.disconnect();
+    completedDownloadObserver = null;
+}
+
+function watchCompletedDownloadMedia(button) {
+    completedDownloadButton = button;
+    completedDownloadOriginalHTML = activeDownloadOriginalHTML;
+    completedDownloadMediaKey = getDownloadButtonMediaKey(button);
+    completedDownloadObserver?.disconnect();
+    completedDownloadObserver = new MutationObserver(() => {
+        clearTimeout(completedDownloadCheckTimer);
+        completedDownloadCheckTimer = setTimeout(() => {
+            if (!completedDownloadButton) return;
+            if (!completedDownloadButton.isConnected) {
+                resetCompletedDownloadButton();
+                return;
+            }
+            const currentKey = getDownloadButtonMediaKey(completedDownloadButton);
+            if (currentKey && completedDownloadMediaKey && currentKey !== completedDownloadMediaKey) {
+                resetCompletedDownloadButton();
+            }
+        }, 80);
+    });
+    completedDownloadObserver.observe(document.body, {
+        subtree: true,
+        childList: true,
+        attributes: true,
+        attributeFilter: ['src', 'srcset', 'poster', 'datetime']
+    });
+}
 
 function renderDownloadButtonIcon(button, type) {
     const icons = {
@@ -1450,7 +1519,8 @@ function finishActiveDownloadButton() {
         renderDownloadButtonIcon(button, 'success');
         button.style.opacity = '1';
         enableOtherDownloadButtons(button);
-        // Keep the completed button disabled and checked until the page is reloaded.
+        // Keep the checkmark only while this same media item remains visible.
+        watchCompletedDownloadMedia(button);
     }
 
     activeDownloadButton = null;
