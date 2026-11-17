@@ -161,10 +161,17 @@ $(function () {
 
     $body.on('change', '.IG_POPUP_DIG select.ih-download-option', function () {
         const $select = $(this);
-        if ($select.attr('data-option') !== 'collisionMode') return;
+        const option = $select.attr('data-option');
         const value = $select.val();
-        if (!['overwrite', 'suffix', 'skip'].includes(value)) return;
 
+        if (option === 'destinationMode') {
+            if (!['browser', 'folder'].includes(value)) return;
+            DOWNLOAD_OPTIONS.destinationMode = value;
+            GM_setValue(DOWNLOAD_OPTION_STORAGE_KEYS.destinationMode, value);
+            return;
+        }
+
+        if (option !== 'collisionMode' || !['overwrite', 'suffix', 'skip'].includes(value)) return;
         DOWNLOAD_OPTIONS.collisionMode = value;
         GM_setValue(DOWNLOAD_OPTION_STORAGE_KEYS.collisionMode, value);
     });
