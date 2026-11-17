@@ -1395,3 +1395,19 @@ div[class]:hover+.volume_slider>div,
 .globalSettings.is-disabled > span {
     cursor: not-allowed;
 }
+
+
+/* Download button progress feedback */
+.ih-download-spinner {
+    animation: ih-download-spin 1s linear infinite;
+}
+
+@keyframes ih-download-spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+.ih-download-status-active {
+    pointer-events: none;
+}
