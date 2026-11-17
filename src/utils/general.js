@@ -1786,32 +1786,33 @@ export async function triggerDownload(blob, filename) {
     const url = URL.createObjectURL(blob);
     if (DOWNLOAD_OPTIONS.saveLocationDialog === 'show' || USER_SETTING.USE_EXTERNAL_DOWNLOAD_MODE) {
         try {
-            await new Promise(resolve => {
+            return await new Promise(resolve => {
                 GM_download({
                     url,
                     name: filename,
                     ...(DOWNLOAD_OPTIONS.saveLocationDialog === 'show' ? { saveAs: true } : {}),
-                    onload: resolve,
-                    onerror: resolve
+                    onload: () => resolve(true),
+                    onerror: () => resolve(false),
+                    ontimeout: () => resolve(false)
                 });
             });
         } finally {
             URL.revokeObjectURL(url);
         }
     }
-    else {
-        const link = document.createElement("a");
-        link.href = url;
-        link.download = filename;
-        link.rel = "noopener";
-        link.style.display = "none";
-        document.body.appendChild(link);
-        link.click();
-        setTimeout(() => {
-            try { document.body.removeChild(link); } catch { /* noop */ }
-            URL.revokeObjectURL(url);
-        }, 250);
-    }
+
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = filename;
+    link.rel = "noopener";
+    link.style.display = "none";
+    document.body.appendChild(link);
+    link.click();
+    setTimeout(() => {
+        try { document.body.removeChild(link); } catch { /* noop */ }
+        URL.revokeObjectURL(url);
+    }, 250);
+    return true;
 }
 
 /**
