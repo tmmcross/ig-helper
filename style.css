@@ -1345,15 +1345,15 @@ div[class]:hover+.volume_slider>div,
 
 /* IG Helper+ settings layout */
 .ih-download-folder-row {
-    display: flex;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.5fr);
     align-items: center;
-    justify-content: space-between;
-    gap: 12px;
-    min-height: 38px;
+    gap: 10px;
+    padding: 5px 0 9px;
     font-size: 14px;
 }
 .ih-download-folder-label {
-    flex: 0 0 auto;
+    min-width: 0;
 }
 .ih-download-folder-control {
     display: flex;
@@ -1394,29 +1394,29 @@ div[class]:hover+.volume_slider>div,
 }
 .ih-download-options {
     display: grid;
-    gap: 5px;
+    gap: 0;
     padding: 2px 8px 6px;
 }
 .ih-download-setting-row {
-    display: flex;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(145px, 42%);
     align-items: center;
-    justify-content: space-between;
-    gap: 12px;
-    min-height: 38px;
+    gap: 10px;
+    min-width: 0;
+    min-height: 42px;
+    margin: 0;
     font-size: 14px;
 }
 .ih-download-setting-row > span {
-    flex: 1;
+    min-width: 0;
+    line-height: 1.35;
+    overflow-wrap: anywhere;
 }
 .ih-download-setting-row select {
-    min-width: 150px;
-    max-width: 58%;
-}
-.ih-settings-note {
-    margin: 2px 0;
-    color: rgb(var(--ig-secondary-text));
-    font-size: 12px;
-    line-height: 1.45;
+    box-sizing: border-box;
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
 }
 .globalSettings.is-disabled {
     opacity: .45;
