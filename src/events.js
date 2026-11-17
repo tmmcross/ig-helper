@@ -164,6 +164,7 @@ $(function () {
         const optionName = $select.attr('data-option');
         const value = $select.val();
         const allowedOptions = {
+            saveLocationDialog: ['show', 'skip'],
             filenameMode: ['media_id', 'fork'],
             usernamePlacement: ['subfolder', 'filename'],
             collisionMode: ['overwrite', 'suffix', 'skip']
