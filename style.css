@@ -1341,3 +1341,52 @@ div[class]:hover+.volume_slider>div,
     border-style: solid;
     opacity: 1;
 }
+
+
+/* IG Helper+ settings layout */
+.ih-settings-section {
+    margin: 14px 0 18px;
+}
+.ih-settings-section > h3 {
+    margin: 0 0 7px;
+    padding: 0 10px 6px;
+    border-bottom: 1px solid rgb(var(--ih-line));
+    font-size: 14px;
+    font-weight: 700;
+}
+.ih-settings-items {
+    display: block;
+}
+.ih-download-options {
+    display: grid;
+    gap: 5px;
+    padding: 2px 8px 6px;
+}
+.ih-download-setting-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    min-height: 38px;
+    font-size: 14px;
+}
+.ih-download-setting-row > span {
+    flex: 1;
+}
+.ih-download-setting-row select {
+    min-width: 150px;
+    max-width: 58%;
+}
+.ih-settings-note {
+    margin: 2px 0;
+    color: rgb(var(--ig-secondary-text));
+    font-size: 12px;
+    line-height: 1.45;
+}
+.globalSettings.is-disabled {
+    opacity: .45;
+    cursor: not-allowed;
+}
+.globalSettings.is-disabled > span {
+    cursor: not-allowed;
+}
