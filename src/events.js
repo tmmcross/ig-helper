@@ -1,4 +1,4 @@
-import { state, USER_SETTING, $body, PARENT_CHILD_MAPPING } from "./settings";
+import { state, USER_SETTING, DOWNLOAD_OPTIONS, DOWNLOAD_OPTION_STORAGE_KEYS, $body, PARENT_CHILD_MAPPING } from "./settings";
 import {
     reloadScript,
     triggerLinkElement, openNewTab, saveFiles, logger, updatePopupSelectionSummary,
@@ -157,6 +157,32 @@ $(function () {
             }
             e.preventDefault();
         }
+    });
+
+    $body.on('change', '.IG_POPUP_DIG select.ih-download-option', function () {
+        const $select = $(this);
+        const optionName = $select.attr('data-option');
+        const value = $select.val();
+        const allowedOptions = {
+            filenameMode: ['media_id', 'fork'],
+            usernamePlacement: ['subfolder', 'filename'],
+            collisionMode: ['overwrite', 'suffix', 'skip']
+        };
+
+        if (!allowedOptions[optionName]?.includes(value)) return;
+
+        DOWNLOAD_OPTIONS[optionName] = value;
+        GM_setValue(DOWNLOAD_OPTION_STORAGE_KEYS[optionName], value);
+
+        if (optionName === 'filenameMode') {
+            const isForkFilename = value === 'fork';
+            $('.IG_POPUP_DIG input#AUTO_RENAME, .IG_POPUP_DIG input#RENAME_PUBLISH_DATE')
+                .prop('disabled', !isForkFilename)
+                .closest('label')
+                .toggleClass('is-disabled', !isForkFilename);
+        }
+
+        console.log('download option', optionName, value);
     });
 
     $body.on('change', '.IG_POPUP_DIG input', function () {
