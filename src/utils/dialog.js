@@ -338,7 +338,14 @@ export function showSetting() {
         $popupBody.append($section);
     });
 
-    const assignedSettings = settingGroups.flatMap(group => group.names);
+    const assignedSettings = [
+        ...settingGroups.flatMap(group => group.names),
+        'AUTO_RENAME',
+        'RENAME_PUBLISH_DATE',
+        'MATCH_VIDEO_FILENAME_TO_THUMBNAIL',
+        'MODIFY_RESOURCE_EXIF',
+        'CAPTURE_IMAGE_VIA_MEDIA_CACHE'
+    ];
     const unassignedSettings = Object.keys(USER_SETTING).filter(name => !assignedSettings.includes(name));
     if (unassignedSettings.length) {
         const $section = $('<section class="ih-settings-section"></section>');
