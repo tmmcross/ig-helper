@@ -1722,8 +1722,11 @@ export async function tryHandleDashFromMediaItem({
  */
 export async function triggerDownload(blob, filename) {
     if (DOWNLOAD_OPTIONS.destinationMode === "folder") {
-        await writeBlobToDownloadDirectory(blob, filename);
-        return;
+        const result = await writeBlobToDownloadDirectory(blob, filename, DOWNLOAD_OPTIONS.collisionMode);
+        if (result.skipped) {
+            logger('[Download skipped: file already exists]', result.filename);
+        }
+        return result;
     }
 
     const url = URL.createObjectURL(blob);
