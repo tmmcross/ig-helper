@@ -885,6 +885,7 @@ export function registerPostClickHandlers() {
                 $a.wrap('<div></div>');
                 $a.before('<label class="inner_box_wrapper"><input class="inner_box" type="checkbox"><span></span></label>');
                 $a.after(`<div data-ih-locale-title="NEW_TAB" title="${_i18n("NEW_TAB")}" class="newTab">${SVG.NEW_TAB}</div>`);
+                $a.after(`<div class="ih-popup-download-status" aria-hidden="true">${SVG.DOWNLOAD}</div>`);
 
                 if ($a.data('name') == 'video') {
                     $a.after(`<div data-ih-locale-title="VIDEO_THUMBNAIL" title="${_i18n("VIDEO_THUMBNAIL")}" class="videoThumbnail">${SVG.THUMBNAIL}</div>`);
@@ -1061,6 +1062,7 @@ export async function createMediaListDOM(postURL, selector, message) {
             $a.wrap('<div></div>');
             $a.before('<label class="inner_box_wrapper"><input class="inner_box" type="checkbox"><span></span></label>');
             $a.after(`<div data-ih-locale-title="NEW_TAB" title="${_i18n("NEW_TAB")}" class="newTab">${SVG.NEW_TAB}</div>`);
+            $a.after(`<div class="ih-popup-download-status" aria-hidden="true">${SVG.DOWNLOAD}</div>`);
 
             if ($a.data('name') == 'video') {
                 $a.after(`<div data-ih-locale-title="VIDEO_THUMBNAIL" title="${_i18n("VIDEO_THUMBNAIL")}" class="videoThumbnail">${SVG.THUMBNAIL}</div>`);

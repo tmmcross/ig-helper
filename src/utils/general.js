@@ -1353,8 +1353,11 @@ export function beginDownloadButtonStatus(button) {
     $button.addClass('ih-download-status-active').html(SVG.DOWNLOAD_LOADING);
 }
 
-function trackDownloadButtonStart() {
-    $('.ih-download-status-active').each(function () {
+function trackDownloadButtonStart(statusButton = null) {
+    const $buttons = $('.ih-download-status-active').not('.ih-popup-download-status');
+    if (statusButton) $buttons.add(statusButton);
+
+    $buttons.each(function () {
         const $button = $(this);
         $button.data('ihDownloadStarted', true);
         $button.data('ihDownloadPending', ($button.data('ihDownloadPending') || 0) + 1);
@@ -1366,8 +1369,11 @@ function logRenameDebug(stage, details) {
     console.info('[IG Helper Rename Debug]', stage, details);
 }
 
-function trackDownloadButtonFinish(success) {
-    $('.ih-download-status-active').each(function () {
+function trackDownloadButtonFinish(success, statusButton = null) {
+    const $buttons = $('.ih-download-status-active').not('.ih-popup-download-status');
+    if (statusButton) $buttons.add(statusButton);
+
+    $buttons.each(function () {
         const $button = $(this);
         if (!success) $button.data('ihDownloadFailed', true);
         const pending = Math.max(0, ($button.data('ihDownloadPending') || 1) - 1);
@@ -1391,12 +1397,13 @@ function trackDownloadButtonFinish(success) {
  * @param  {Integer}  metadata.timestamp
  * @param  {String}  metadata.filetype
  * @param  {String}  metadata.shortcode
+ * @param  {HTMLElement|null} metadata.downloadStatusButton
  * @param  {Integer|null}  metadata.index
  * @param  {String|null}  metadata.uid
  * @return {Promise}
  */
 export function saveFiles(downloadLink, metadata) {
-    trackDownloadButtonStart();
+    trackDownloadButtonStart(metadata?.downloadStatusButton);
     return new Promise(resolve => {
         setTimeout(() => {
             updateLoadingBar(true);
@@ -1435,17 +1442,17 @@ export function saveFiles(downloadLink, metadata) {
                     ...(DOWNLOAD_OPTIONS.saveLocationDialog === 'show' ? { saveAs: true } : {}),
                     onload: () => {
                         updateLoadingBar(false);
-                        trackDownloadButtonFinish(true);
+                        trackDownloadButtonFinish(true, metadata?.downloadStatusButton);
                         resolve(true);
                     },
                     onerror: () => {
                         updateLoadingBar(false);
-                        trackDownloadButtonFinish(false);
+                        trackDownloadButtonFinish(false, metadata?.downloadStatusButton);
                         resolve(false);
                     },
                     ontimeout: () => {
                         updateLoadingBar(false);
-                        trackDownloadButtonFinish(false);
+                        trackDownloadButtonFinish(false, metadata?.downloadStatusButton);
                         resolve(false);
                     }
                 });
@@ -1460,13 +1467,13 @@ export function saveFiles(downloadLink, metadata) {
                     .then(result => {
                         updateLoadingBar(false);
                         const success = result !== false;
-                        trackDownloadButtonFinish(success);
+                        trackDownloadButtonFinish(success, metadata?.downloadStatusButton);
                         resolve(success);
                     })
                     .catch(err => {
                         updateLoadingBar(false);
                         console.error('saveFiles failed:', err);
-                        trackDownloadButtonFinish(false);
+                        trackDownloadButtonFinish(false, metadata?.downloadStatusButton);
                         resolve(false);
                     });
             }
@@ -2212,11 +2219,18 @@ async function changeExifData(blob, metadata) {
  *
  * @param  {Object}   element     - The element containing resource link metadata.
  * @param  {Boolean}  [isPreview] - True to preview in a new tab instead of downloading.
- * @return {void}
+ * @return {Promise<boolean>}
  */
 export async function triggerLinkElement($element, isPreview = false) {
+    let statusButton = null;
+    let saveStarted = false;
+
     try {
         const $el = $($element);
+        statusButton = $el.parent().children('.ih-popup-download-status').get(0) || null;
+        if (!isPreview && statusButton) {
+            beginDownloadButtonStatus(statusButton);
+        }
 
         let date = new Date().getTime();
         let timestamp = Math.floor(date / 1000);
@@ -2243,7 +2257,8 @@ export async function triggerLinkElement($element, isPreview = false) {
 
         if (!isPreview && index < 0) {
             alert(_i18n('NO_CHECK_RESOURCE'));
-            return;
+            if (statusButton) trackDownloadButtonFinish(false, statusButton);
+            return false;
         }
 
         if (USER_SETTING.CAPTURE_IMAGE_VIA_MEDIA_CACHE) {
@@ -2253,40 +2268,50 @@ export async function triggerLinkElement($element, isPreview = false) {
                 if (!downloadOnly && isPreview) {
                     openNewTab(cached);
                 } else {
-                    await saveFiles(cached, {
+                    saveStarted = true;
+                    const success = await saveFiles(cached, {
                         username,
                         sourceType,
                         timestamp,
                         filetype: filetype || 'jpg',
                         shortcode,
-                        index
+                        index,
+                        downloadStatusButton: statusButton
                     });
+                    return success;
                 }
-                return;
+                return true;
             }
         }
 
         if (href) {
             if (!downloadOnly && isPreview) {
                 openNewTab(replaceSameOriginHost(href));
+                return true;
             } else {
-                await saveFiles(href, {
+                saveStarted = true;
+                const success = await saveFiles(href, {
                     username,
                     sourceType,
                     timestamp,
                     filetype,
                     shortcode,
                     index,
-                    thumbnailURL
+                    thumbnailURL,
+                    downloadStatusButton: statusButton
                 });
+                return success;
             }
-            return;
         }
 
         alert('triggerLinkElement(): Cannot find download URL.');
+        if (statusButton) trackDownloadButtonFinish(false, statusButton);
+        return false;
     } catch (err) {
         console.error('Occur error in triggerLinkElement:', err);
         logger('Occur error in triggerLinkElement:', err);
+        if (statusButton && !saveStarted) trackDownloadButtonFinish(false, statusButton);
+        return false;
     }
 }
 
