@@ -352,7 +352,7 @@ $(function () {
     // Show per-button progress/result feedback when downloads run without a save dialog.
     $body.on('click', '.IG_DW_MAIN, .IG_DW_ALL_MAIN, .IG_DWSTORY, .IG_DWSTORY_ALL, .IG_DWSTORY_THUMBNAIL, .IG_DWHISTORY, .IG_DWHISTORY_ALL, .IG_DWHISTORY_THUMBNAIL, .IG_REELS, .IG_REELS_THUMBNAIL, .IG_DWPROFILE', function () {
         const $button = $(this);
-        if ($button.hasClass('IG_DW_MAIN') && !USER_SETTING.DIRECT_DOWNLOAD_VISIBLE_RESOURCE) return;
+        if ($button.hasClass('IG_DW_MAIN') && !USER_SETTING.DIRECT_DOWNLOAD_VISIBLE_RESOURCE && !USER_SETTING.DIRECT_DOWNLOAD_ALL) return;
         if ($button.hasClass('IG_DW_ALL_MAIN') && !USER_SETTING.DIRECT_DOWNLOAD_ALL) return;
         if (($button.hasClass('IG_DWSTORY_ALL') || $button.hasClass('IG_DWHISTORY_ALL')) && !USER_SETTING.DIRECT_DOWNLOAD_STORY) return;
         beginDownloadButtonStatus(this);
