@@ -8593,8 +8593,8 @@
     }
 
     function trackDownloadButtonStart(statusButton = null) {
-        const $buttons = $('.ih-download-status-active').not('.ih-popup-download-status');
-        if (statusButton) $buttons.add(statusButton);
+        let $buttons = $('.ih-download-status-active').not('.ih-popup-download-status');
+        if (statusButton) $buttons = $buttons.add(statusButton);
 
         $buttons.each(function () {
             const $button = $(this);
@@ -8609,8 +8609,8 @@
     }
 
     function trackDownloadButtonFinish(success, statusButton = null) {
-        const $buttons = $('.ih-download-status-active').not('.ih-popup-download-status');
-        if (statusButton) $buttons.add(statusButton);
+        let $buttons = $('.ih-download-status-active').not('.ih-popup-download-status');
+        if (statusButton) $buttons = $buttons.add(statusButton);
 
         $buttons.each(function () {
             const $button = $(this);
