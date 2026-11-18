@@ -1421,6 +1421,7 @@ export function saveFiles(downloadLink, metadata) {
                 saveLocationDialog: DOWNLOAD_OPTIONS.saveLocationDialog,
                 username: metadata.username,
                 shortcode,
+                mediaId: metadata.mediaId,
                 filetype,
                 generatedFilename: downloadName
             });
@@ -1862,7 +1863,7 @@ export async function triggerDownload(blob, filename) {
  * @return {String}  The generated filename
  */
 export function getSaveFileName(downloadLink, metadata) {
-    let { username, sourceType, timestamp, filetype, shortcode, index, uid, thumbnailURL } = metadata;
+    let { username, sourceType, timestamp, filetype, shortcode, mediaId, index, uid, thumbnailURL } = metadata;
     const originalUrlFilename = new URL(downloadLink).pathname.split('/').at(-1);
 
     logRenameDebug('getSaveFileName input', {
@@ -1871,6 +1872,7 @@ export function getSaveFileName(downloadLink, metadata) {
         username,
         sourceType,
         shortcode,
+        mediaId,
         timestamp,
         filetype,
         originalUrlFilename
@@ -1911,7 +1913,7 @@ export function getSaveFileName(downloadLink, metadata) {
         '%USERNAME%': username,
         '%SOURCE_TYPE%': sourceType,
         '%SHORTCODE%': shortcode || '',
-        '%MEDIA_ID%': /^\d+$/.test(String(shortcode || '')) ? String(shortcode) : (shortcodeToId(String(shortcode || '')) || ''),
+        '%MEDIA_ID%': mediaId || (/^\d+$/.test(String(shortcode || '')) ? String(shortcode) : (shortcodeToId(String(shortcode || '')) || '')),
         '%YEAR%': year,
         '%2-YEAR%': year.substr(-2),
         '%MONTH%': month,
@@ -2275,6 +2277,7 @@ export async function triggerLinkElement($element, isPreview = false) {
                         timestamp,
                         filetype: filetype || 'jpg',
                         shortcode,
+                        mediaId,
                         index,
                         downloadStatusButton: statusButton
                     });
@@ -2296,6 +2299,7 @@ export async function triggerLinkElement($element, isPreview = false) {
                     timestamp,
                     filetype,
                     shortcode,
+                    mediaId,
                     index,
                     thumbnailURL,
                     downloadStatusButton: statusButton
