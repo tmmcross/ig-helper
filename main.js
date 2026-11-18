@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name               IG Helper+
 // @namespace          https://github.com/tmmcross/ig-helper/
-// @version            5.4.5.2
+// @version            5.4.5.3
 // @description        Download photos and videos from Instagram posts in one click, including Stories, Reels, and profile pictures.
 // @description:ar     نزّل صورًا ومقاطع فيديو من منشورات Instagram بنقرة واحدة، بما في ذلك القصص وReels وصور الملف الشخصي.
 // @description:de     Lade Fotos und Videos aus Instagram-Beiträgen mit einem Klick herunter, einschließlich Stories, Reels und Profilbildern.
@@ -38,11 +38,11 @@
 // @connect            raw.githubusercontent.com
 // @require            https://cdn.jsdelivr.net/npm/mediabunny@1.34.5/dist/bundles/mediabunny.min.cjs#sha256-wUFR+x2bDvpqgMAVGy2CvGvULyjTGvGy4UUAm8rae5U=
 // @require            https://code.jquery.com/jquery-4.0.0.min.js#sha256-OaVG6prZf4v69dPg6PhVattBXkcOWQB62pdZ3ORyrao=
-// @resource           INTERNAL_CSS https://cdn.jsdelivr.net/gh/tmmcross/ig-helper@ecb0935fbbdb1856844e612d5eca849e5e6f60af/style.css
+// @resource           INTERNAL_CSS https://cdn.jsdelivr.net/gh/tmmcross/ig-helper@993083954d88734c8dbfac72b17ee5434cd20e6a/style.css
 // @resource           LOCALE_MANIFEST https://cdn.jsdelivr.net/gh/SN-Koarashi/ig-helper@master/locale/manifest.json
 // @supportURL         https://github.com/tmmcross/ig-helper/issues
-// @updateURL          https://raw.githubusercontent.com/tmmcross/ig-helper/master/main.js
-// @downloadURL        https://raw.githubusercontent.com/tmmcross/ig-helper/master/main.js
+// @updateURL          https://raw.githubusercontent.com/tmmcross/ig-helper/feature/ig-helper-plus-foundation/main.js
+// @downloadURL        https://raw.githubusercontent.com/tmmcross/ig-helper/feature/ig-helper-plus-foundation/main.js
 // @contributionURL    https://ko-fi.com/snkoarashi
 // @icon               https://www.google.com/s2/favicons?domain=www.instagram.com&sz=32
 // @compatible         chrome >= 100
