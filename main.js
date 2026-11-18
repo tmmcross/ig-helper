@@ -8639,7 +8639,7 @@
             setTimeout(() => {
                 updateLoadingBar(true);
 
-                if (metadata?.shortcode?.match(/^\\d+$/) != null) {
+                if (metadata?.shortcode?.match(/^\d+$/) != null) {
                     metadata.shortcode = idToShortcode(metadata.shortcode);
                 }
 
@@ -9142,7 +9142,7 @@
             '%USERNAME%': username,
             '%SOURCE_TYPE%': sourceType,
             '%SHORTCODE%': shortcode || '',
-            '%MEDIA_ID%': /^\\d+$/.test(String(shortcode || '')) ? String(shortcode) : (shortcodeToId(String(shortcode || '')) || ''),
+            '%MEDIA_ID%': /^\d+$/.test(String(shortcode || '')) ? String(shortcode) : (shortcodeToId(String(shortcode || '')) || ''),
             '%YEAR%': year,
             '%2-YEAR%': year.substr(-2),
             '%MONTH%': month,
