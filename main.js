@@ -8660,6 +8660,7 @@
                     saveLocationDialog: DOWNLOAD_OPTIONS.saveLocationDialog,
                     username: metadata.username,
                     shortcode,
+                    mediaId: metadata.mediaId,
                     filetype,
                     generatedFilename: downloadName
                 });
@@ -9101,7 +9102,7 @@
      * @return {String}  The generated filename
      */
     function getSaveFileName(downloadLink, metadata) {
-        let { username, sourceType, timestamp, filetype, shortcode, index, uid, thumbnailURL } = metadata;
+        let { username, sourceType, timestamp, filetype, shortcode, mediaId, index, uid, thumbnailURL } = metadata;
         const originalUrlFilename = new URL(downloadLink).pathname.split('/').at(-1);
 
         logRenameDebug('getSaveFileName input', {
@@ -9110,6 +9111,7 @@
             username,
             sourceType,
             shortcode,
+            mediaId,
             timestamp,
             filetype,
             originalUrlFilename
@@ -9150,7 +9152,7 @@
             '%USERNAME%': username,
             '%SOURCE_TYPE%': sourceType,
             '%SHORTCODE%': shortcode || '',
-            '%MEDIA_ID%': /^\d+$/.test(String(shortcode || '')) ? String(shortcode) : (shortcodeToId(String(shortcode || '')) || ''),
+            '%MEDIA_ID%': mediaId || (/^\d+$/.test(String(shortcode || '')) ? String(shortcode) : (shortcodeToId(String(shortcode || '')) || '')),
             '%YEAR%': year,
             '%2-YEAR%': year.substr(-2),
             '%MONTH%': month,
@@ -9514,6 +9516,7 @@
                             timestamp,
                             filetype: filetype || 'jpg',
                             shortcode,
+                            mediaId,
                             index,
                             downloadStatusButton: statusButton
                         });
@@ -9535,6 +9538,7 @@
                         timestamp,
                         filetype,
                         shortcode,
+                        mediaId,
                         index,
                         thumbnailURL,
                         downloadStatusButton: statusButton
