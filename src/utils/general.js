@@ -1342,10 +1342,10 @@ export function setDownloadProgress(now, total) {
 
 /**
  * Update the icon on the download button that initiated the current save operation.
- * Status feedback is only enabled when the save dialog is disabled.
+ * Status feedback is enabled for download actions, regardless of save-dialog mode.
  */
 export function beginDownloadButtonStatus(button) {
-    if (DOWNLOAD_OPTIONS.saveLocationDialog === 'show' || !button) return;
+    if (!button) return;
     const $button = $(button);
     $button.data('ihDownloadPending', 0);
     $button.data('ihDownloadStarted', false);
@@ -1354,7 +1354,6 @@ export function beginDownloadButtonStatus(button) {
 }
 
 function trackDownloadButtonStart() {
-    if (DOWNLOAD_OPTIONS.saveLocationDialog === 'show') return;
     $('.ih-download-status-active').each(function () {
         const $button = $(this);
         $button.data('ihDownloadStarted', true);
@@ -1368,7 +1367,6 @@ function logRenameDebug(stage, details) {
 }
 
 function trackDownloadButtonFinish(success) {
-    if (DOWNLOAD_OPTIONS.saveLocationDialog === 'show') return;
     $('.ih-download-status-active').each(function () {
         const $button = $(this);
         if (!success) $button.data('ihDownloadFailed', true);
