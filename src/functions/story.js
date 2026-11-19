@@ -62,7 +62,7 @@ export async function createStoryListDOM(obj, type) {
             $a.wrap('<div></div>');
             $a.before('<label class="inner_box_wrapper"><input class="inner_box" type="checkbox"><span></span></label>');
             $a.after(`<div data-ih-locale-title="NEW_TAB" title="${_i18n("NEW_TAB")}" class="newTab">${SVG.NEW_TAB}</div>`);
-            $a.after(`<div class="ih-popup-download-status" aria-hidden="true">${SVG.DOWNLOAD}</div>`);
+            $a.after(`<div class="newTab ih-popup-download-status" style="right:38px;pointer-events:none" aria-hidden="true">${SVG.DOWNLOAD}</div>`);
 
             if ($a.data('type') == 'mp4') {
                 $a.after(`<div data-ih-locale-title="VIDEO_THUMBNAIL" title="${_i18n("VIDEO_THUMBNAIL")}" class="videoThumbnail">${SVG.THUMBNAIL}</div>`);

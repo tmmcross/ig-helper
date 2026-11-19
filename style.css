@@ -669,21 +669,6 @@ kbd {
     transition: background-color .15s;
 }
 
-.IG_POPUP_DIG_BODY .ih-popup-download-status {
-    position: absolute;
-    right: 38px;
-    top: 0px;
-    z-index: 3;
-    padding: 7px;
-    line-height: 0;
-    border-radius: 8px;
-    pointer-events: none;
-}
-
-.IG_POPUP_DIG_BODY .ih-popup-download-status.ih-download-status-active {
-    color: rgb(var(--ih-accent));
-}
-
 .IG_POPUP_DIG_BODY .videoThumbnail {
     position: absolute;
     right: 0px;
