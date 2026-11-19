@@ -6,7 +6,7 @@ import {
     replaceSameOriginHost,
     setDownloadProgress,
     triggerReactClickHandler,
-    markContainerPositioned, saveFiles
+    markContainerPositioned, saveFiles, decoratePopupResourceLink
 } from "../utils/general";
 import { _i18n } from "../utils/i18n";
 import { openImageViewer } from "../utils/image_viewer";
@@ -877,20 +877,7 @@ export function registerPostClickHandlers() {
             }
 
             $('.IG_POPUP_DIG .IG_POPUP_DIG_MAIN .IG_POPUP_DIG_BODY a').each(function () {
-                const $a = $(this);
-                if ($a.parent().is('div') && $a.prev('.inner_box_wrapper').length > 0) {
-                    return;
-                }
-
-                $a.wrap('<div></div>');
-                $a.before('<label class="inner_box_wrapper"><input class="inner_box" type="checkbox"><span></span></label>');
-                $a.after(`<div data-ih-locale-title="NEW_TAB" title="${_i18n("NEW_TAB")}" class="newTab">${SVG.NEW_TAB}</div>`);
-                $a.after(`<div class="newTab ih-popup-download-status" style="right:38px;pointer-events:none" aria-hidden="true">${SVG.DOWNLOAD}</div>`);
-
-                if ($a.data('name') == 'video') {
-                    $a.after(`<div data-ih-locale-title="VIDEO_THUMBNAIL" title="${_i18n("VIDEO_THUMBNAIL")}" class="videoThumbnail">${SVG.THUMBNAIL}</div>`);
-                }
-
+                decoratePopupResourceLink(this);
                 updatePopupSelectionSummary();
             });
 
@@ -1058,15 +1045,7 @@ export async function createMediaListDOM(postURL, selector, message) {
         $("#_SNLOAD").remove();
         $('.IG_POPUP_DIG #batch_download_selected, .IG_POPUP_DIG #batch_download_direct').prop('disabled', false);
         $('.IG_POPUP_DIG .IG_POPUP_DIG_MAIN .IG_POPUP_DIG_BODY a').each(function () {
-            const $a = $(this);
-            $a.wrap('<div></div>');
-            $a.before('<label class="inner_box_wrapper"><input class="inner_box" type="checkbox"><span></span></label>');
-            $a.after(`<div data-ih-locale-title="NEW_TAB" title="${_i18n("NEW_TAB")}" class="newTab">${SVG.NEW_TAB}</div>`);
-            $a.after(`<div class="newTab ih-popup-download-status" style="right:38px;pointer-events:none" aria-hidden="true">${SVG.DOWNLOAD}</div>`);
-
-            if ($a.data('name') == 'video') {
-                $a.after(`<div data-ih-locale-title="VIDEO_THUMBNAIL" title="${_i18n("VIDEO_THUMBNAIL")}" class="videoThumbnail">${SVG.THUMBNAIL}</div>`);
-            }
+            decoratePopupResourceLink(this);
         });
         updatePopupSelectionSummary();
 

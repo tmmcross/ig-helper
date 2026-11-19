@@ -10,7 +10,7 @@ import {
     getMediaIdOfStoryOrHighlightFromEmbeddedJSON, getVisibleImageMediaId,
     resolveMediaIdOfStoryOrHighlightByTimestamp, getStoryButtonContainer,
     markContainerPositioned, updateStoryThumbnailButton, getVisibleVideoPosterMediaIds,
-    getBestCandidateUrl
+    getBestCandidateUrl, decoratePopupResourceLink
 } from "../utils/general";
 import { getUserId, getStories, isReelsMediaVideo } from "../utils/api";
 import { _i18n } from "../utils/i18n";
@@ -58,15 +58,7 @@ export async function createStoryListDOM(obj, type) {
         });
 
         $selector.find('a').each(function () {
-            const $a = $(this);
-            $a.wrap('<div></div>');
-            $a.before('<label class="inner_box_wrapper"><input class="inner_box" type="checkbox"><span></span></label>');
-            $a.after(`<div data-ih-locale-title="NEW_TAB" title="${_i18n("NEW_TAB")}" class="newTab">${SVG.NEW_TAB}</div>`);
-            $a.after(`<div class="newTab ih-popup-download-status" style="right:38px;pointer-events:none" aria-hidden="true">${SVG.DOWNLOAD}</div>`);
-
-            if ($a.data('type') == 'mp4') {
-                $a.after(`<div data-ih-locale-title="VIDEO_THUMBNAIL" title="${_i18n("VIDEO_THUMBNAIL")}" class="videoThumbnail">${SVG.THUMBNAIL}</div>`);
-            }
+            decoratePopupResourceLink(this);
         });
 
         // Single source of truth: activates BATCH_DOWNLOAD_DIRECT (since total > 0)
