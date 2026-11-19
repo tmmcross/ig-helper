@@ -70,24 +70,6 @@
     margin: 0 -4px;
 }
 
-.IG_POPUP_DIG.has-resource-list .IG_POPUP_DIG_MAIN {
-    top: 1rem;
-    bottom: 1rem;
-    display: flex;
-    flex-direction: column;
-    max-height: none;
-}
-
-.IG_POPUP_DIG.has-resource-list .IG_POPUP_DIG_TITLE {
-    flex: 0 0 auto;
-}
-
-.IG_POPUP_DIG.has-resource-list .IG_POPUP_DIG_BODY {
-    flex: 1 1 auto;
-    min-height: 0;
-    max-height: none;
-}
-
 .IG_POPUP_DIG_BODY svg {
     color: rgb(var(--ig-primary-text));
 }
