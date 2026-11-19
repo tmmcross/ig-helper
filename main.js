@@ -1386,6 +1386,31 @@
     }
 
     /**
+     * getBestCandidateUrl
+     * @description Return the URL from image_versions2.candidates with the largest height.
+     *
+     * @param  {?Object}  item
+     * @return {String}
+     */
+    function getBestCandidateUrl(item) {
+        const candidates = item?.image_versions2?.candidates;
+        if (Array.isArray(candidates) && candidates.length > 0) {
+            const best = candidates.reduce((max, c) => {
+                if (!c?.url) return max;
+                if (!max) return c;
+                if ((c.height || 0) !== (max.height || 0)) {
+                    return (c.height || 0) > (max.height || 0) ? c : max;
+                }
+                return (c.width || 0) > (max.width || 0) ? c : max;
+            }, null);
+
+            if (best?.url) return best.url;
+        }
+
+        return item?.display_url || item?.display_resources?.at(-1)?.src || '';
+    }
+
+    /**
      * onHighlightsStoryAll
      * @description Trigger user's highlight all download event.
      *
@@ -5465,11 +5490,12 @@
                         }
                     }
                     else {
+                        const bestStoryImgUrl = getBestCandidateUrl(mediaItem);
                         if (isPreview) {
-                            openNewTab(getBestCandidateUrl(mediaItem));
+                            openNewTab(bestStoryImgUrl);
                         }
                         else {
-                            saveFiles(getBestCandidateUrl(mediaItem), {
+                            saveFiles(bestStoryImgUrl, {
                                 username,
                                 sourceType: "stories",
                                 timestamp,
@@ -5591,10 +5617,7 @@
             let videoThumbnailURL = "";
             let mediaId = null;
             const selectThumbnail = item => {
-                const candidates = item?.image_versions2?.candidates || [];
-                const image = candidates.filter(candidate => candidate.url).reduce((best, candidate) =>
-                    !best || candidate.width > best.width ? candidate : best, null);
-                videoThumbnailURL = image?.url || item?.display_url || '';
+                videoThumbnailURL = getBestCandidateUrl(item);
                 if (videoThumbnailURL) {
                     mediaId = item.pk ?? item.id;
                     if (USER_SETTING.RENAME_PUBLISH_DATE) {

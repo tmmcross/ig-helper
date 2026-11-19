@@ -509,11 +509,12 @@ export async function onStory(isDownload, isForce, isPreview) {
                     }
                 }
                 else {
+                    const bestStoryImgUrl = getBestCandidateUrl(mediaItem);
                     if (isPreview) {
-                        openNewTab(getBestCandidateUrl(mediaItem));
+                        openNewTab(bestStoryImgUrl);
                     }
                     else {
-                        saveFiles(getBestCandidateUrl(mediaItem), {
+                        saveFiles(bestStoryImgUrl, {
                             username,
                             sourceType: "stories",
                             timestamp,
@@ -635,10 +636,7 @@ export async function onStoryThumbnail(isDownload, isForce) {
         let videoThumbnailURL = "";
         let mediaId = null;
         const selectThumbnail = item => {
-            const candidates = item?.image_versions2?.candidates || [];
-            const image = candidates.filter(candidate => candidate.url).reduce((best, candidate) =>
-                !best || candidate.width > best.width ? candidate : best, null);
-            videoThumbnailURL = image?.url || item?.display_url || '';
+            videoThumbnailURL = getBestCandidateUrl(item);
             if (videoThumbnailURL) {
                 mediaId = item.pk ?? item.id;
                 if (USER_SETTING.RENAME_PUBLISH_DATE) {
