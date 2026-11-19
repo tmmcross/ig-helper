@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name               IG Helper+
 // @namespace          https://github.com/tmmcross/ig-helper/
-// @version            5.4.5.5
+// @version            5.4.5.6
 // @description        Download photos and videos from Instagram posts in one click, including Stories, Reels, and profile pictures.
 // @description:ar     نزّل صورًا ومقاطع فيديو من منشورات Instagram بنقرة واحدة، بما في ذلك القصص وReels وصور الملف الشخصي.
 // @description:de     Lade Fotos und Videos aus Instagram-Beiträgen mit einem Klick herunter, einschließlich Stories, Reels und Profilbildern.
@@ -38,7 +38,7 @@
 // @connect            raw.githubusercontent.com
 // @require            https://cdn.jsdelivr.net/npm/mediabunny@1.34.5/dist/bundles/mediabunny.min.cjs#sha256-wUFR+x2bDvpqgMAVGy2CvGvULyjTGvGy4UUAm8rae5U=
 // @require            https://code.jquery.com/jquery-4.0.0.min.js#sha256-OaVG6prZf4v69dPg6PhVattBXkcOWQB62pdZ3ORyrao=
-// @resource           INTERNAL_CSS https://cdn.jsdelivr.net/gh/tmmcross/ig-helper@00d5fccf52a3d0c83b6cbe85b82748f86b52f0d8/style.css
+// @resource           INTERNAL_CSS https://cdn.jsdelivr.net/gh/tmmcross/ig-helper@ecb0935fbbdb1856844e612d5eca849e5e6f60af/style.css
 // @resource           LOCALE_MANIFEST https://cdn.jsdelivr.net/gh/SN-Koarashi/ig-helper@master/locale/manifest.json
 // @supportURL         https://github.com/tmmcross/ig-helper/issues
 // @updateURL          https://raw.githubusercontent.com/tmmcross/ig-helper/feature/ig-helper-plus-foundation/main.js
@@ -9967,8 +9967,13 @@
      */
     function IG_createDM(hasHidden, hasCheckbox) {
         let isHidden = (hasHidden) ? "hidden" : "";
-        const dialogClasses = ['IG_POPUP_DIG', isHidden, hasCheckbox ? 'has-resource-list' : ''].filter(Boolean).join(' ');
-        $body.append('<div class="' + dialogClasses + '"><div class="IG_POPUP_DIG_BG"></div><div class="IG_POPUP_DIG_MAIN"><div class="IG_POPUP_DIG_TITLE"></div><div class="IG_POPUP_DIG_BODY"></div></div></div>');
+        const $dialog = $('<div class="IG_POPUP_DIG ' + isHidden + '"><div class="IG_POPUP_DIG_BG"></div><div class="IG_POPUP_DIG_MAIN"><div class="IG_POPUP_DIG_TITLE"></div><div class="IG_POPUP_DIG_BODY"></div></div></div>');
+        $body.append($dialog);
+        if (hasCheckbox) {
+            $dialog.find('.IG_POPUP_DIG_MAIN').css({ top: '1rem', bottom: '1rem', display: 'flex', 'flex-direction': 'column', 'max-height': 'none' });
+            $dialog.find('.IG_POPUP_DIG_TITLE').css('flex', '0 0 auto');
+            $dialog.find('.IG_POPUP_DIG_BODY').css({ flex: '1 1 auto', 'min-height': 0, 'max-height': 'none' });
+        }
         // OPTIMIZATION: cache popup title element used 3+ times in this function
         const $title = $('.IG_POPUP_DIG .IG_POPUP_DIG_MAIN .IG_POPUP_DIG_TITLE');
         $title.append(`<div style="position:relative;min-height:36px;text-align:center;margin-bottom: 7px;"><div style="position:absolute;left:0px;line-height: 18px;"><kbd>${getPlatformModifierKey()}</kbd>+<kbd>Q</kbd> [<span data-ih-locale="CLOSE">${_i18n("CLOSE")}</span>]</div><div style="line-height: 18px;">IG Helper v${GM_info.script.version}</div><div id="post_info" style="line-height: 14px;font-size:14px;">Post ID: <span id="article-id"></span></div><div class="IG_POPUP_DIG_BTN">${SVG.CLOSE}</div></div>`);
