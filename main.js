@@ -1386,31 +1386,6 @@
     }
 
     /**
-     * getBestCandidateUrl
-     * @description Return the URL from image_versions2.candidates with the largest height.
-     *
-     * @param  {?Object}  item
-     * @return {String}
-     */
-    function getBestCandidateUrl(item) {
-        const candidates = item?.image_versions2?.candidates;
-        if (Array.isArray(candidates) && candidates.length > 0) {
-            const best = candidates.reduce((max, c) => {
-                if (!c?.url) return max;
-                if (!max) return c;
-                if ((c.height || 0) !== (max.height || 0)) {
-                    return (c.height || 0) > (max.height || 0) ? c : max;
-                }
-                return (c.width || 0) > (max.width || 0) ? c : max;
-            }, null);
-
-            if (best?.url) return best.url;
-        }
-
-        return item?.display_url || item?.display_resources?.at(-1)?.src || '';
-    }
-
-    /**
      * onHighlightsStoryAll
      * @description Trigger user's highlight all download event.
      *
@@ -2506,7 +2481,7 @@
                 markContainerPositioned($childElement);
 
                 // Add the mark that download is ready
-                var username = $self.find(':is(header[data-interactable], article[data-interactable] div[data-interactable], div:has(+ hr)) a[href] div>span[dir="auto"]').filter(function () {
+                var username = $self.find(':is(header[data-interactable], article div.xbmvrgn + div[class]:not([style]), div:has(+ hr)) a[href] div>span[dir="auto"]').filter(function () {
                     return $(this)?.text()?.length > 0;
                 }).first().text();
 
