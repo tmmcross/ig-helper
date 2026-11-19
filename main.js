@@ -2905,20 +2905,7 @@
                 }
 
                 $('.IG_POPUP_DIG .IG_POPUP_DIG_MAIN .IG_POPUP_DIG_BODY a').each(function () {
-                    const $a = $(this);
-                    if ($a.parent().is('div') && $a.prev('.inner_box_wrapper').length > 0) {
-                        return;
-                    }
-
-                    $a.wrap('<div></div>');
-                    $a.before('<label class="inner_box_wrapper"><input class="inner_box" type="checkbox"><span></span></label>');
-                    $a.after(`<div data-ih-locale-title="NEW_TAB" title="${_i18n("NEW_TAB")}" class="newTab">${SVG.NEW_TAB}</div>`);
-                    $a.after(`<div class="newTab ih-popup-download-status" style="right:38px;pointer-events:none" aria-hidden="true">${SVG.DOWNLOAD}</div>`);
-
-                    if ($a.data('name') == 'video') {
-                        $a.after(`<div data-ih-locale-title="VIDEO_THUMBNAIL" title="${_i18n("VIDEO_THUMBNAIL")}" class="videoThumbnail">${SVG.THUMBNAIL}</div>`);
-                    }
-
+                    decoratePopupResourceLink(this);
                     updatePopupSelectionSummary();
                 });
 
@@ -3086,15 +3073,7 @@
             $("#_SNLOAD").remove();
             $('.IG_POPUP_DIG #batch_download_selected, .IG_POPUP_DIG #batch_download_direct').prop('disabled', false);
             $('.IG_POPUP_DIG .IG_POPUP_DIG_MAIN .IG_POPUP_DIG_BODY a').each(function () {
-                const $a = $(this);
-                $a.wrap('<div></div>');
-                $a.before('<label class="inner_box_wrapper"><input class="inner_box" type="checkbox"><span></span></label>');
-                $a.after(`<div data-ih-locale-title="NEW_TAB" title="${_i18n("NEW_TAB")}" class="newTab">${SVG.NEW_TAB}</div>`);
-                $a.after(`<div class="newTab ih-popup-download-status" style="right:38px;pointer-events:none" aria-hidden="true">${SVG.DOWNLOAD}</div>`);
-
-                if ($a.data('name') == 'video') {
-                    $a.after(`<div data-ih-locale-title="VIDEO_THUMBNAIL" title="${_i18n("VIDEO_THUMBNAIL")}" class="videoThumbnail">${SVG.THUMBNAIL}</div>`);
-                }
+                decoratePopupResourceLink(this);
             });
             updatePopupSelectionSummary();
 
@@ -5035,15 +5014,7 @@
             });
 
             $selector.find('a').each(function () {
-                const $a = $(this);
-                $a.wrap('<div></div>');
-                $a.before('<label class="inner_box_wrapper"><input class="inner_box" type="checkbox"><span></span></label>');
-                $a.after(`<div data-ih-locale-title="NEW_TAB" title="${_i18n("NEW_TAB")}" class="newTab">${SVG.NEW_TAB}</div>`);
-                $a.after(`<div class="newTab ih-popup-download-status" style="right:38px;pointer-events:none" aria-hidden="true">${SVG.DOWNLOAD}</div>`);
-
-                if ($a.data('type') == 'mp4') {
-                    $a.after(`<div data-ih-locale-title="VIDEO_THUMBNAIL" title="${_i18n("VIDEO_THUMBNAIL")}" class="videoThumbnail">${SVG.THUMBNAIL}</div>`);
-                }
+                decoratePopupResourceLink(this);
             });
 
             // Single source of truth: activates BATCH_DOWNLOAD_DIRECT (since total > 0)
@@ -7269,6 +7240,24 @@
         }
 
         return item?.display_url || item?.display_resources?.at(-1)?.src || '';
+    }
+
+    /**
+     * Add the shared controls around a resource link in the popup chooser.
+     * @param {Object} link - A jQuery-wrapped popup resource link.
+     */
+    function decoratePopupResourceLink(link) {
+        const $link = $(link);
+        if (!$link.length || ($link.parent().is('div') && $link.prev('.inner_box_wrapper').length > 0)) return;
+
+        $link.wrap('<div></div>');
+        $link.before('<label class="inner_box_wrapper"><input class="inner_box" type="checkbox"><span></span></label>');
+        $link.after(`<div data-ih-locale-title="NEW_TAB" title="${_i18n("NEW_TAB")}" class="newTab">${SVG.NEW_TAB}</div>`);
+        $link.after(`<div class="newTab ih-popup-download-status" style="right:38px;pointer-events:none" aria-hidden="true">${SVG.DOWNLOAD}</div>`);
+
+        if ($link.data('type') === 'mp4' || $link.data('name') === 'video') {
+            $link.after(`<div data-ih-locale-title="VIDEO_THUMBNAIL" title="${_i18n("VIDEO_THUMBNAIL")}" class="videoThumbnail">${SVG.THUMBNAIL}</div>`);
+        }
     }
 
     const HASTE_BITMAP_ALPHABET = '0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ-_';
